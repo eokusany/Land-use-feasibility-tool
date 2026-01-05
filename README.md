@@ -6,18 +6,18 @@
 
 A comprehensive web application for analyzing land use policies and development potential for properties in Central and Northern Alberta. This tool helps developers, planners, and property investors quickly assess feasibility by automatically retrieving municipal zoning information, land use policies, and generating professional feasibility reports.
 
-## 🎯 Perfect For
+##  Perfect For
 - **Land Developers** - Quickly assess development potential
 - **Property Investors** - Evaluate investment opportunities  
 - **Planning Consultants** - Streamline feasibility studies
 - **Real Estate Professionals** - Provide detailed property analysis
 
-## 🚀 Quick Demo
+## Quick Demo
 ![Tool Demo](https://via.placeholder.com/800x400/2c5aa0/ffffff?text=Alberta+Land+Use+Tool+Demo)
 
 *Transform property emails into professional feasibility reports in minutes!*
 
-## 🏗️ Features
+## Features
 
 ### Core Functionality
 - **Property Analysis**: Parse addresses and legal descriptions to identify properties
@@ -37,7 +37,7 @@ Currently supports municipalities between Red Deer and Athabasca, including:
 - Lacombe County, Ponoka County, Wetaskiwin County, Camrose County
 - Leduc County, Strathcona County, Sturgeon County, Parkland County, Athabasca County
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.8 or higher
@@ -79,7 +79,7 @@ python app.py
 6. **Access the tool:**
 Open your web browser and navigate to `http://localhost:5001`
 
-### 🧪 Test Installation
+### Test Installation
 ```bash
 python test_sample_property.py
 ```
@@ -120,7 +120,7 @@ Based on your sample email about the 14.55-acre rural commercial property near P
 - Infrastructure considerations (septic, water, access)
 - Regulatory requirements and next steps
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### Core Components
 
@@ -157,7 +157,7 @@ The tool integrates with various Alberta land use data sources:
 - Cadastral mapping data (Altalis)
 - Municipal zoning databases
 
-## 📊 API Endpoints
+## API Endpoints
 
 ### POST `/api/analyze_property`
 Analyze property and return land use information.
@@ -213,13 +213,13 @@ To add new municipalities, update the `municipalities_data` in `municipality_loo
 }
 ```
 
-## 📈 Development Roadmap
+## Development Roadmap
 
 ### Phase 1 (Current)
-- ✅ Core property analysis functionality
-- ✅ Basic municipality coverage (Red Deer to Athabasca)
-- ✅ PDF report generation
-- ✅ Web interface
+-  Core property analysis functionality
+- Basic municipality coverage (Red Deer to Athabasca)
+-  PDF report generation
+- Web interface
 
 ### Phase 2 (Future)
 - [ ] Real-time municipal data integration
@@ -254,7 +254,7 @@ def create_custom_report_section(self, data):
     pass
 ```
 
-## 🚨 Important Disclaimers
+##  Important Disclaimers
 
 1. **Preliminary Assessment Only**: This tool provides preliminary feasibility assessments based on available data. Always verify information with municipal authorities.
 
@@ -271,7 +271,7 @@ For technical support or questions about the tool:
 - Check municipal websites for current policies
 - Consult with local planning professionals
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
@@ -286,17 +286,17 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This tool provides preliminary feasibility assessments based on available data. Always verify information with municipal authorities before making development decisions. This tool does not constitute professional planning or legal advice.
 
-## 📞 Support
+## Support
 
 - 📧 **Issues**: [GitHub Issues](https://github.com/eokusany/Land-use-feasibility-tool/issues)
 - 📖 **Documentation**: See README and code comments
 - 🌟 **Star this repo** if you find it useful!
 
-## 🏆 Acknowledgments
+## Acknowledgments
 
 - Alberta municipalities for providing public land use data
 - Flask and Python communities for excellent frameworks
@@ -304,6 +304,6 @@ This tool provides preliminary feasibility assessments based on available data. 
 
 ---
 
-**🎯 Built for Alberta land developers and planners to streamline feasibility assessments and accelerate development planning.**
+** Built for Alberta land developers and planners to streamline feasibility assessments and accelerate development planning.**
 
-**⭐ Star this repository if it helps your land development projects!**
+** Star this repository if it helps your land development projects!**
