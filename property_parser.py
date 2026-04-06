@@ -2,250 +2,238 @@ import re
 from typing import Dict, Optional, List
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+from canada_municipalities import CANADIAN_MUNICIPALITIES
+
+
+# Build a flat lookup set of all Canadian city names for fast hint matching
+_ALL_CITY_NAMES: List[str] = []
+for _prov, _cities in CANADIAN_MUNICIPALITIES.items():
+    _ALL_CITY_NAMES.extend(_cities.keys())
+
 
 class PropertyParser:
-    """Parse property information from various input formats"""
-    
+    """Parse property information from various input formats (all of Canada)."""
+
     def __init__(self):
-        self.geolocator = Nominatim(user_agent="alberta_land_use_tool")
-        
-        # Legal description patterns for Alberta
+        self.geolocator = Nominatim(user_agent="canland_feasibility_tool/1.0")
+
+        # Legal description patterns (primarily western Canada DLS, also lot/block plan)
         self.legal_patterns = {
-            'quarter_section': re.compile(r'([NSEW]{1,2})\s*(\d{1,2})\s*-\s*(\d{1,3})\s*-\s*(\d{1,3})\s*-\s*([WE])\s*(\d)', re.IGNORECASE),
-            'lot_block': re.compile(r'LOT\s*(\d+)\s*,?\s*BLOCK\s*(\d+)\s*,?\s*PLAN\s*(\w+)', re.IGNORECASE),
-            'parcel': re.compile(r'PARCEL\s*(\w+)\s*,?\s*PLAN\s*(\w+)', re.IGNORECASE),
-            'section': re.compile(r'SECTION\s*(\d{1,2})\s*,?\s*TOWNSHIP\s*(\d{1,3})\s*,?\s*RANGE\s*(\d{1,3})\s*,?\s*([WE])\s*(\d)', re.IGNORECASE)
+            "quarter_section": re.compile(
+                r"([NSEW]{1,2})\s*(\d{1,2})\s*-\s*(\d{1,3})\s*-\s*(\d{1,3})\s*-\s*([WE])\s*(\d)",
+                re.IGNORECASE,
+            ),
+            "lot_block": re.compile(
+                r"LOT\s*(\d+)\s*,?\s*BLOCK\s*(\d+)\s*,?\s*PLAN\s*(\w+)", re.IGNORECASE
+            ),
+            "parcel": re.compile(r"PARCEL\s*(\w+)\s*,?\s*PLAN\s*(\w+)", re.IGNORECASE),
+            "section": re.compile(
+                r"SECTION\s*(\d{1,2})\s*,?\s*TOWNSHIP\s*(\d{1,3})\s*,?\s*RANGE\s*(\d{1,3})\s*,?\s*([WE])\s*(\d)",
+                re.IGNORECASE,
+            ),
+            # Ontario/Quebec PIDs
+            "pid": re.compile(r"\bPID[:\s]*(\d{9})\b", re.IGNORECASE),
         }
-        
-        # Address patterns
+
         self.address_patterns = {
-            'street_address': re.compile(r'(\d+)\s+([A-Za-z0-9\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Crescent|Cres))', re.IGNORECASE),
-            'rural_address': re.compile(r'(RR|Rural Route|Range Road|Township Road|Highway|Hwy)\s*(\d+)', re.IGNORECASE),
-            'postal_code': re.compile(r'([A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d)', re.IGNORECASE)
+            "street_address": re.compile(
+                r"(\d+)\s+([A-Za-z0-9\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|"
+                r"Boulevard|Blvd|Way|Circle|Cir|Court|Ct|Crescent|Cres|Place|Pl|Terrace|Tr))",
+                re.IGNORECASE,
+            ),
+            "rural_address": re.compile(
+                r"(RR|Rural Route|Range Road|Township Road|County Road|Highway|Hwy|Route)\s*(\d+)",
+                re.IGNORECASE,
+            ),
+            "postal_code": re.compile(r"([A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d)", re.IGNORECASE),
         }
-    
-    def parse_property_info(self, address: str = "", legal_description: str = "", additional_info: str = "") -> Optional[Dict]:
-        """
-        Parse property information from various input formats
-        
-        Args:
-            address: Street address or rural address
-            legal_description: Legal land description
-            additional_info: Additional property information
-        
-        Returns:
-            Dictionary containing parsed property information
-        """
+
+        # Canadian province/territory abbreviations to help geocoding
+        self._province_suffixes = {
+            "BC": "British Columbia",
+            "AB": "Alberta",
+            "SK": "Saskatchewan",
+            "MB": "Manitoba",
+            "ON": "Ontario",
+            "QC": "Quebec",
+            "NB": "New Brunswick",
+            "NS": "Nova Scotia",
+            "PE": "Prince Edward Island",
+            "NL": "Newfoundland and Labrador",
+            "YT": "Yukon",
+            "NT": "Northwest Territories",
+            "NU": "Nunavut",
+        }
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def parse_property_info(
+        self,
+        address: str = "",
+        legal_description: str = "",
+        additional_info: str = "",
+        province: str = "",
+    ) -> Optional[Dict]:
+        """Parse property information and return a normalized dict."""
         property_info = {
-            'raw_input': {
-                'address': address,
-                'legal_description': legal_description,
-                'additional_info': additional_info
+            "raw_input": {
+                "address": address,
+                "legal_description": legal_description,
+                "additional_info": additional_info,
+                "province": province,
             },
-            'parsed_address': None,
-            'parsed_legal': None,
-            'coordinates': None,
-            'municipality_hints': [],
-            'property_details': {}
+            "parsed_address": None,
+            "parsed_legal": None,
+            "coordinates": None,
+            "municipality_hints": [],
+            "property_details": {},
+            "province_hint": province.upper() if province else "",
         }
-        
-        # Parse address
+
         if address:
-            property_info['parsed_address'] = self._parse_address(address)
-            
-            # Try to geocode the address
-            coordinates = self._geocode_address(address)
-            if coordinates:
-                property_info['coordinates'] = coordinates
-        
-        # Parse legal description
+            property_info["parsed_address"] = self._parse_address(address)
+            coords = self._geocode_address(address, province)
+            if coords:
+                property_info["coordinates"] = coords
+
         if legal_description:
-            property_info['parsed_legal'] = self._parse_legal_description(legal_description)
-        
-        # Extract municipality hints from all inputs
+            property_info["parsed_legal"] = self._parse_legal_description(legal_description)
+
         all_text = f"{address} {legal_description} {additional_info}"
-        property_info['municipality_hints'] = self._extract_municipality_hints(all_text)
-        
-        # Extract property details from additional info
+        property_info["municipality_hints"] = self._extract_municipality_hints(all_text)
+
         if additional_info:
-            property_info['property_details'] = self._extract_property_details(additional_info)
-        
-        return property_info if self._is_valid_property_info(property_info) else None
-    
+            property_info["property_details"] = self._extract_property_details(additional_info)
+
+        return property_info if self._is_valid(property_info) else None
+
+    # ------------------------------------------------------------------
+    # Parsing helpers
+    # ------------------------------------------------------------------
+
     def _parse_address(self, address: str) -> Dict:
-        """Parse street or rural address"""
-        parsed = {
-            'type': 'unknown',
-            'components': {},
-            'full_address': address.strip()
-        }
-        
-        # Check for street address
-        street_match = self.address_patterns['street_address'].search(address)
-        if street_match:
-            parsed['type'] = 'street'
-            parsed['components'] = {
-                'number': street_match.group(1),
-                'street': street_match.group(2).strip()
-            }
-        
-        # Check for rural address
-        rural_match = self.address_patterns['rural_address'].search(address)
-        if rural_match:
-            parsed['type'] = 'rural'
-            parsed['components'] = {
-                'road_type': rural_match.group(1),
-                'road_number': rural_match.group(2)
-            }
-        
-        # Extract postal code
-        postal_match = self.address_patterns['postal_code'].search(address)
-        if postal_match:
-            parsed['components']['postal_code'] = postal_match.group(1).upper().replace(' ', '')
-        
+        parsed = {"type": "unknown", "components": {}, "full_address": address.strip()}
+
+        m = self.address_patterns["street_address"].search(address)
+        if m:
+            parsed["type"] = "street"
+            parsed["components"] = {"number": m.group(1), "street": m.group(2).strip()}
+
+        m = self.address_patterns["rural_address"].search(address)
+        if m:
+            parsed["type"] = "rural"
+            parsed["components"] = {"road_type": m.group(1), "road_number": m.group(2)}
+
+        m = self.address_patterns["postal_code"].search(address)
+        if m:
+            parsed["components"]["postal_code"] = m.group(1).upper().replace(" ", "")
+
         return parsed
-    
+
     def _parse_legal_description(self, legal_desc: str) -> Dict:
-        """Parse legal land description"""
-        parsed = {
-            'type': 'unknown',
-            'components': {},
-            'full_description': legal_desc.strip()
-        }
-        
-        # Try different legal description patterns
-        for pattern_name, pattern in self.legal_patterns.items():
-            match = pattern.search(legal_desc)
-            if match:
-                parsed['type'] = pattern_name
-                
-                if pattern_name == 'quarter_section':
-                    parsed['components'] = {
-                        'quarter': match.group(1),
-                        'section': match.group(2),
-                        'township': match.group(3),
-                        'range': match.group(4),
-                        'meridian_direction': match.group(5),
-                        'meridian': match.group(6)
+        parsed = {"type": "unknown", "components": {}, "full_description": legal_desc.strip()}
+
+        for name, pattern in self.legal_patterns.items():
+            m = pattern.search(legal_desc)
+            if m:
+                parsed["type"] = name
+                if name == "quarter_section":
+                    parsed["components"] = {
+                        "quarter": m.group(1),
+                        "section": m.group(2),
+                        "township": m.group(3),
+                        "range": m.group(4),
+                        "meridian_direction": m.group(5),
+                        "meridian": m.group(6),
                     }
-                elif pattern_name == 'lot_block':
-                    parsed['components'] = {
-                        'lot': match.group(1),
-                        'block': match.group(2),
-                        'plan': match.group(3)
+                elif name == "lot_block":
+                    parsed["components"] = {
+                        "lot": m.group(1),
+                        "block": m.group(2),
+                        "plan": m.group(3),
                     }
-                elif pattern_name == 'parcel':
-                    parsed['components'] = {
-                        'parcel': match.group(1),
-                        'plan': match.group(2)
+                elif name == "parcel":
+                    parsed["components"] = {"parcel": m.group(1), "plan": m.group(2)}
+                elif name == "section":
+                    parsed["components"] = {
+                        "section": m.group(1),
+                        "township": m.group(2),
+                        "range": m.group(3),
+                        "meridian_direction": m.group(4),
+                        "meridian": m.group(5),
                     }
-                elif pattern_name == 'section':
-                    parsed['components'] = {
-                        'section': match.group(1),
-                        'township': match.group(2),
-                        'range': match.group(3),
-                        'meridian_direction': match.group(4),
-                        'meridian': match.group(5)
-                    }
+                elif name == "pid":
+                    parsed["components"] = {"pid": m.group(1)}
                 break
-        
+
         return parsed
-    
-    def _geocode_address(self, address: str) -> Optional[Dict]:
-        """Geocode address to get coordinates"""
+
+    def _geocode_address(self, address: str, province: str = "") -> Optional[Dict]:
         try:
-            # Add Alberta, Canada to improve geocoding accuracy
-            full_address = f"{address}, Alberta, Canada"
+            # Append province name and country for better accuracy
+            suffix = ""
+            if province and province.upper() in self._province_suffixes:
+                suffix = f", {self._province_suffixes[province.upper()]}"
+            full_address = f"{address}{suffix}, Canada"
             location = self.geolocator.geocode(full_address, timeout=10)
-            
             if location:
                 return {
-                    'latitude': location.latitude,
-                    'longitude': location.longitude,
-                    'display_name': location.address
+                    "latitude": location.latitude,
+                    "longitude": location.longitude,
+                    "display_name": location.address,
                 }
         except (GeocoderTimedOut, GeocoderServiceError):
             pass
-        
         return None
-    
+
     def _extract_municipality_hints(self, text: str) -> List[str]:
-        """Extract potential municipality names from text"""
-        # Common Alberta municipalities between Red Deer and Athabasca
-        municipalities = [
-            'Red Deer', 'Lacombe', 'Ponoka', 'Wetaskiwin', 'Camrose', 'Leduc',
-            'Edmonton', 'St. Albert', 'Sherwood Park', 'Fort Saskatchewan',
-            'Morinville', 'Legal', 'Bon Accord', 'Gibbons', 'Redwater',
-            'Smoky Lake', 'Vilna', 'Mundare', 'Lamont', 'Bruderheim',
-            'Athabasca', 'Boyle', 'Westlock', 'Barrhead', 'Mayerthorpe',
-            'Whitecourt', 'Slave Lake', 'High Prairie', 'Valleyview'
-        ]
-        
-        # Also include county names
-        counties = [
-            'Lacombe County', 'Ponoka County', 'Wetaskiwin County',
-            'Camrose County', 'Leduc County', 'Strathcona County',
-            'Sturgeon County', 'Parkland County', 'Lac Ste. Anne County',
-            'Barrhead County', 'Westlock County', 'Athabasca County'
-        ]
-        
-        all_locations = municipalities + counties
-        found_hints = []
-        
+        found = []
         text_lower = text.lower()
-        for location in all_locations:
-            if location.lower() in text_lower:
-                found_hints.append(location)
-        
-        return found_hints
-    
-    def _extract_property_details(self, additional_info: str) -> Dict:
-        """Extract property details from additional information"""
-        details = {}
-        
-        # Extract acreage
-        acreage_match = re.search(r'(\d+\.?\d*)\s*acres?', additional_info, re.IGNORECASE)
-        if acreage_match:
-            details['acreage'] = float(acreage_match.group(1))
-        
-        # Extract zoning hints
-        zoning_keywords = ['commercial', 'residential', 'rural', 'agricultural', 'industrial']
-        for keyword in zoning_keywords:
-            if keyword in additional_info.lower():
-                details.setdefault('zoning_hints', []).append(keyword)
-        
-        # Extract development intentions
-        development_keywords = ['develop', 'cottages', 'subdivision', 'building', 'construction']
-        for keyword in development_keywords:
-            if keyword in additional_info.lower():
-                details.setdefault('development_intentions', []).append(keyword)
-        
-        # Extract infrastructure mentions
-        infrastructure_keywords = ['septic', 'water', 'power', 'sewer', 'gas', 'internet']
-        for keyword in infrastructure_keywords:
-            if keyword in additional_info.lower():
-                details.setdefault('infrastructure_mentions', []).append(keyword)
-        
+        for city_name in _ALL_CITY_NAMES:
+            if city_name.lower() in text_lower:
+                found.append(city_name)
+        return found
+
+    def _extract_property_details(self, info: str) -> Dict:
+        details: Dict = {}
+
+        m = re.search(r"(\d+\.?\d*)\s*acres?", info, re.IGNORECASE)
+        if m:
+            details["acreage"] = float(m.group(1))
+
+        m = re.search(r"(\d+\.?\d*)\s*hectares?", info, re.IGNORECASE)
+        if m:
+            details.setdefault("acreage", round(float(m.group(1)) * 2.471, 2))
+
+        for kw in ["commercial", "residential", "rural", "agricultural", "industrial"]:
+            if kw in info.lower():
+                details.setdefault("zoning_hints", []).append(kw)
+
+        for kw in ["develop", "cottages", "cabin", "subdivision", "building", "construction", "resort"]:
+            if kw in info.lower():
+                details.setdefault("development_intentions", []).append(kw)
+
+        for kw in ["septic", "water", "power", "sewer", "gas", "internet", "utility"]:
+            if kw in info.lower():
+                details.setdefault("infrastructure_mentions", []).append(kw)
+
         return details
-    
-    def _is_valid_property_info(self, property_info: Dict) -> bool:
-        """Check if parsed property information is valid"""
-        # Must have either a valid address or legal description
-        has_address = (property_info.get('parsed_address') and 
-                      property_info['parsed_address']['type'] != 'unknown')
-        
-        has_legal = (property_info.get('parsed_legal') and 
-                    property_info['parsed_legal']['type'] != 'unknown')
-        
-        has_coordinates = property_info.get('coordinates') is not None
-        
-        has_municipality_hints = len(property_info.get('municipality_hints', [])) > 0
-        
-        has_property_details = len(property_info.get('property_details', {})) > 0
-        
-        has_raw_input = bool(property_info.get('raw_input', {}).get('address') or 
-                           property_info.get('raw_input', {}).get('legal_description') or
-                           property_info.get('raw_input', {}).get('additional_info'))
-        
-        # Valid if we have at least one way to identify the property
-        return has_address or has_legal or has_coordinates or has_municipality_hints or has_property_details or has_raw_input
+
+    def _is_valid(self, prop: Dict) -> bool:
+        has_address = (
+            prop.get("parsed_address") and prop["parsed_address"]["type"] != "unknown"
+        )
+        has_legal = (
+            prop.get("parsed_legal") and prop["parsed_legal"]["type"] != "unknown"
+        )
+        has_coords = prop.get("coordinates") is not None
+        has_hints = len(prop.get("municipality_hints", [])) > 0
+        has_details = bool(prop.get("property_details"))
+        has_raw = bool(
+            prop.get("raw_input", {}).get("address")
+            or prop.get("raw_input", {}).get("legal_description")
+            or prop.get("raw_input", {}).get("additional_info")
+        )
+        return any([has_address, has_legal, has_coords, has_hints, has_details, has_raw])

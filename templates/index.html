@@ -1,548 +1,1051 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alberta Land Use Feasibility Tool</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #2c5aa0;
-            --secondary-color: #28a745;
-            --accent-color: #ffc107;
-            --light-bg: #f8f9fa;
-        }
-        
-        body {
-            background: linear-gradient(135deg, var(--light-bg) 0%, #e9ecef 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .header-section {
-            background: linear-gradient(135deg, var(--primary-color) 0%, #1e3d72 100%);
-            color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
-        }
-        
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-        
-        .card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color) 0%, #1e3d72 100%);
-            border: none;
-            border-radius: 25px;
-            padding: 12px 30px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(44, 90, 160, 0.4);
-        }
-        
-        .btn-success {
-            background: linear-gradient(135deg, var(--secondary-color) 0%, #1e7e34 100%);
-            border: none;
-            border-radius: 25px;
-            padding: 12px 30px;
-            font-weight: 600;
-        }
-        
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            transition: all 0.3s ease;
-        }
-        
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 0.2rem rgba(44, 90, 160, 0.25);
-        }
-        
-        .loading-spinner {
-            display: none;
-        }
-        
-        .results-section {
-            display: none;
-        }
-        
-        .alert {
-            border-radius: 10px;
-            border: none;
-        }
-        
-        .badge {
-            font-size: 0.9em;
-            padding: 8px 12px;
-            border-radius: 20px;
-        }
-        
-        .feasibility-high {
-            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
-        }
-        
-        .feasibility-moderate {
-            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
-        }
-        
-        .feasibility-low {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-        }
-        
-        .info-icon {
-            color: var(--primary-color);
-            margin-right: 8px;
-        }
-        
-        .section-divider {
-            height: 3px;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            border: none;
-            border-radius: 2px;
-            margin: 2rem 0;
-        }
-        
-        .feature-card {
-            text-align: center;
-            padding: 2rem;
-            height: 100%;
-        }
-        
-        .feature-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-        }
-        
-        @media (max-width: 768px) {
-            .header-section {
-                padding: 1rem 0;
-            }
-            
-            .card {
-                margin-bottom: 1rem;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CanLand — Canadian Land Use Feasibility Platform</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <!-- Leaflet.js map -->
+  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --cl-red:   #d52b1e;   /* Canada red */
+      --cl-navy:  #1a2744;
+      --cl-blue:  #2c5aa0;
+      --cl-light: #f4f6fb;
+      --cl-muted: #6c757d;
+      --cl-border:#dee2e6;
+      --radius:   12px;
+      --shadow:   0 4px 24px rgba(0,0,0,.09);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      background: var(--cl-light);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #212529;
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ─────────────────────────────────────────────── */
+    .cl-nav {
+      background: var(--cl-navy);
+      padding: .75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    }
+    .cl-nav .brand {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      color: #fff;
+      text-decoration: none;
+    }
+    .cl-nav .brand .maple { color: var(--cl-red); font-size: 1.4rem; }
+    .cl-nav .brand span { font-size: 1.25rem; font-weight: 700; letter-spacing: -.5px; }
+    .cl-nav .brand small { font-size: .7rem; color: rgba(255,255,255,.55); display: block; line-height: 1; }
+    .cl-nav-links a {
+      color: rgba(255,255,255,.75);
+      text-decoration: none;
+      font-size: .88rem;
+      margin-left: 1.25rem;
+      transition: color .2s;
+    }
+    .cl-nav-links a:hover { color: #fff; }
+
+    /* ── Hero ────────────────────────────────────────────────── */
+    .cl-hero {
+      background: linear-gradient(135deg, var(--cl-navy) 0%, #253a6b 100%);
+      color: #fff;
+      padding: 3.5rem 1.5rem 4rem;
+      text-align: center;
+    }
+    .cl-hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; margin-bottom: .5rem; }
+    .cl-hero h1 span { color: var(--cl-red); }
+    .cl-hero p { font-size: 1.05rem; color: rgba(255,255,255,.75); max-width: 580px; margin: 0 auto 2rem; }
+
+    /* Province pills */
+    .province-pills { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin-top: 1rem; }
+    .province-pills .pill {
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 999px;
+      color: rgba(255,255,255,.8);
+      font-size: .75rem;
+      padding: .25rem .75rem;
+    }
+
+    /* ── Step wizard ─────────────────────────────────────────── */
+    .wizard-wrapper { max-width: 900px; margin: -2.5rem auto 3rem; padding: 0 1rem; }
+
+    .wizard-stepper {
+      display: flex;
+      background: #fff;
+      border-radius: var(--radius) var(--radius) 0 0;
+      border-bottom: 2px solid var(--cl-border);
+      overflow: hidden;
+    }
+    .step-btn {
+      flex: 1;
+      padding: .85rem .5rem;
+      text-align: center;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--cl-muted);
+      background: transparent;
+      border: none;
+      cursor: default;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .2rem;
+      position: relative;
+      transition: color .2s;
+    }
+    .step-btn .step-num {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: var(--cl-border);
+      color: var(--cl-muted);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .8rem; font-weight: 700;
+      transition: background .2s, color .2s;
+    }
+    .step-btn.active { color: var(--cl-blue); }
+    .step-btn.active .step-num { background: var(--cl-blue); color: #fff; }
+    .step-btn.done .step-num { background: #198754; color: #fff; }
+    .step-btn.done { color: #198754; }
+    .step-btn:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      right: 0; top: 50%;
+      transform: translateY(-50%);
+      width: 1px; height: 60%;
+      background: var(--cl-border);
+    }
+
+    /* ── Card base ───────────────────────────────────────────── */
+    .cl-card {
+      background: #fff;
+      border-radius: 0 0 var(--radius) var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2rem;
+    }
+
+    /* ── Form styles ─────────────────────────────────────────── */
+    .form-label { font-weight: 600; font-size: .875rem; color: #495057; }
+    .form-control, .form-select {
+      border-radius: 8px;
+      border: 1.5px solid var(--cl-border);
+      padding: .6rem .9rem;
+      font-size: .93rem;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--cl-blue);
+      box-shadow: 0 0 0 3px rgba(44,90,160,.15);
+    }
+    textarea.form-control { resize: vertical; min-height: 90px; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn-canland {
+      background: linear-gradient(135deg, var(--cl-blue) 0%, #1a3d7e 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .7rem 1.8rem;
+      font-weight: 700;
+      font-size: .95rem;
+      transition: opacity .2s, transform .2s;
+    }
+    .btn-canland:hover { opacity: .9; transform: translateY(-1px); color: #fff; }
+    .btn-canland:disabled { opacity: .55; transform: none; }
+
+    .btn-report {
+      background: linear-gradient(135deg, #198754 0%, #0f5c36 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .65rem 1.4rem;
+      font-weight: 600;
+      font-size: .9rem;
+      transition: opacity .2s;
+    }
+    .btn-report:hover { opacity: .88; color: #fff; }
+
+    .btn-back {
+      background: none;
+      border: 1.5px solid var(--cl-border);
+      color: var(--cl-muted);
+      border-radius: 8px;
+      padding: .65rem 1.4rem;
+      font-size: .9rem;
+    }
+    .btn-back:hover { border-color: #999; color: #333; }
+
+    /* ── Map ─────────────────────────────────────────────────── */
+    #propertyMap {
+      width: 100%; height: 280px;
+      border-radius: 10px;
+      border: 1.5px solid var(--cl-border);
+      margin-top: 1rem;
+      display: none;
+    }
+
+    /* ── Loading overlay ─────────────────────────────────────── */
+    .loading-panel {
+      display: none;
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+    .loading-panel .spinner-border { width: 3rem; height: 3rem; color: var(--cl-blue); }
+    .loading-panel p { color: var(--cl-muted); margin-top: 1rem; }
+
+    /* ── Results ─────────────────────────────────────────────── */
+    .results-panel { display: none; }
+
+    .feasibility-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .5rem 1.1rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: .95rem;
+    }
+    .badge-high    { background: #d1f5e0; color: #0a5c2e; }
+    .badge-moderate{ background: #fff3cd; color: #7a5700; }
+    .badge-low     { background: #fde8e8; color: #8b1a1a; }
+    .badge-unknown { background: #e9ecef; color: #495057; }
+
+    /* Summary cards */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin: 1.25rem 0;
+    }
+    .summary-card {
+      background: var(--cl-light);
+      border: 1px solid var(--cl-border);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    .summary-card .sc-label { font-size: .75rem; color: var(--cl-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+    .summary-card .sc-value { font-size: 1.05rem; font-weight: 700; color: var(--cl-navy); margin-top: .2rem; }
+
+    /* Tabs */
+    .result-tabs .nav-link {
+      color: var(--cl-muted);
+      border-radius: 8px 8px 0 0;
+      font-weight: 600;
+      font-size: .87rem;
+      padding: .55rem 1rem;
+    }
+    .result-tabs .nav-link.active { color: var(--cl-blue); background: #fff; border-color: var(--cl-border) var(--cl-border) #fff; }
+    .result-tabs .tab-content { background: #fff; border: 1px solid var(--cl-border); border-top: none; border-radius: 0 0 10px 10px; padding: 1.5rem; }
+
+    /* Use lists */
+    .use-list { list-style: none; padding: 0; margin: 0; }
+    .use-list li {
+      padding: .35rem 0;
+      font-size: .9rem;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: flex-start;
+      gap: .5rem;
+    }
+    .use-list li:last-child { border-bottom: none; }
+    .use-list .use-icon { color: #198754; margin-top: 2px; flex-shrink: 0; }
+    .use-list .dis-icon  { color: #ffc107; margin-top: 2px; flex-shrink: 0; }
+
+    /* Development standards table */
+    .standards-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .standards-table th {
+      background: var(--cl-light);
+      padding: .55rem .75rem;
+      text-align: left;
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--cl-muted);
+      border-bottom: 2px solid var(--cl-border);
+    }
+    .standards-table td {
+      padding: .55rem .75rem;
+      border-bottom: 1px solid #f3f3f3;
+      color: #333;
+    }
+    .standards-table tr:last-child td { border-bottom: none; }
+
+    /* Municipality contact block */
+    .contact-block {
+      background: var(--cl-light);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      font-size: .9rem;
+    }
+    .contact-block a { color: var(--cl-blue); text-decoration: none; }
+    .contact-block a:hover { text-decoration: underline; }
+    .contact-item { display: flex; align-items: flex-start; gap: .6rem; margin-bottom: .5rem; }
+    .contact-item i { color: var(--cl-muted); width: 16px; flex-shrink: 0; margin-top: 2px; }
+
+    /* Action items */
+    .action-list { padding: 0; margin: 0; counter-reset: actions; }
+    .action-list li {
+      display: flex;
+      gap: .75rem;
+      padding: .5rem 0;
+      font-size: .9rem;
+      border-bottom: 1px solid #f3f3f3;
+      list-style: none;
+      counter-increment: actions;
+    }
+    .action-list li:last-child { border-bottom: none; }
+    .action-num {
+      min-width: 24px; height: 24px;
+      background: var(--cl-blue);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Alert ── error */
+    .cl-alert {
+      display: none;
+      background: #fde8e8;
+      border-left: 4px solid var(--cl-red);
+      border-radius: 8px;
+      padding: .9rem 1rem;
+      font-size: .9rem;
+      color: #7a1a1a;
+      margin-top: 1rem;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    .cl-footer {
+      background: var(--cl-navy);
+      color: rgba(255,255,255,.5);
+      text-align: center;
+      padding: 1.5rem 1rem;
+      font-size: .78rem;
+    }
+    .cl-footer a { color: rgba(255,255,255,.65); text-decoration: none; }
+
+    /* ── Responsive tweaks ───────────────────────────────────── */
+    @media (max-width: 576px) {
+      .cl-hero { padding: 2.5rem 1rem 3.5rem; }
+      .cl-card  { padding: 1.25rem; }
+      .step-btn span.d-sm-inline { display: none !important; }
+    }
+  </style>
 </head>
 <body>
-    <!-- Header Section -->
-    <div class="header-section">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="display-4 mb-2">
-                        <i class="fas fa-map-marked-alt me-3"></i>
-                        Alberta Land Use Feasibility Tool
-                    </h1>
-                    <p class="lead mb-0">Instantly analyze land use policies and development potential for properties in Central and Northern Alberta</p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <img src="https://via.placeholder.com/150x100/ffffff/2c5aa0?text=Alberta" alt="Alberta" class="img-fluid rounded">
-                </div>
-            </div>
+
+<!-- ─── Navbar ──────────────────────────────────────────────── -->
+<nav class="cl-nav">
+  <a href="/" class="brand">
+    <i class="fas fa-leaf maple"></i>
+    <div>
+      <span>CanLand</span>
+      <small>Canadian Land Use Feasibility</small>
+    </div>
+  </a>
+  <div class="cl-nav-links d-none d-md-flex">
+    <a href="#how-it-works"><i class="fas fa-info-circle me-1"></i>How it works</a>
+    <a href="https://github.com" target="_blank"><i class="fab fa-github me-1"></i>GitHub</a>
+  </div>
+</nav>
+
+<!-- ─── Hero ────────────────────────────────────────────────── -->
+<header class="cl-hero">
+  <h1>Land Use Feasibility<br><span>Across All of Canada</span></h1>
+  <p>Enter any Canadian property address to instantly assess zoning, permitted uses, development standards, and generate a professional feasibility report.</p>
+  <div class="province-pills" id="provincePills"></div>
+</header>
+
+<!-- ─── Wizard ──────────────────────────────────────────────── -->
+<div class="wizard-wrapper">
+
+  <!-- Stepper -->
+  <div class="wizard-stepper">
+    <button class="step-btn active" id="step1Btn">
+      <span class="step-num">1</span>
+      <span class="d-sm-inline">Property</span>
+    </button>
+    <button class="step-btn" id="step2Btn">
+      <span class="step-num">2</span>
+      <span class="d-sm-inline">Analysis</span>
+    </button>
+    <button class="step-btn" id="step3Btn">
+      <span class="step-num">3</span>
+      <span class="d-sm-inline">Results</span>
+    </button>
+    <button class="step-btn" id="step4Btn">
+      <span class="step-num">4</span>
+      <span class="d-sm-inline">Report</span>
+    </button>
+  </div>
+
+  <div class="cl-card">
+
+    <!-- ── STEP 1 — Input form ─────────────────────────────── -->
+    <div id="panelStep1">
+      <h5 class="fw-bold mb-1">Enter Property Details</h5>
+      <p class="text-muted small mb-3">Select a province and city, then provide an address or description of the property.</p>
+
+      <form id="propertyForm">
+        <div class="row g-3">
+
+          <!-- Province -->
+          <div class="col-md-4">
+            <label class="form-label" for="provinceSelect"><i class="fas fa-map me-1 text-primary"></i>Province / Territory</label>
+            <select class="form-select" id="provinceSelect">
+              <option value="">— Select Province —</option>
+            </select>
+          </div>
+
+          <!-- City -->
+          <div class="col-md-8">
+            <label class="form-label" for="citySelect"><i class="fas fa-city me-1 text-primary"></i>City / Municipality</label>
+            <select class="form-select" id="citySelect" disabled>
+              <option value="">— Select Province first —</option>
+            </select>
+          </div>
+
+          <!-- Address -->
+          <div class="col-12">
+            <label class="form-label" for="addressInput"><i class="fas fa-location-dot me-1 text-primary"></i>Street Address</label>
+            <input type="text" class="form-control" id="addressInput"
+                   placeholder="e.g. 123 Main Street, Calgary, AB  or  NW 24-38-2-W5M" />
+          </div>
+
+          <!-- Legal description -->
+          <div class="col-md-6">
+            <label class="form-label" for="legalInput"><i class="fas fa-file-alt me-1 text-primary"></i>Legal Description <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="text" class="form-control" id="legalInput"
+                   placeholder="e.g. Lot 1, Block 4, Plan 7821234" />
+          </div>
+
+          <!-- Additional info -->
+          <div class="col-md-6">
+            <label class="form-label" for="additionalInput"><i class="fas fa-comment-alt me-1 text-primary"></i>Additional Details <span class="text-muted fw-normal">(optional)</span></label>
+            <textarea class="form-control" id="additionalInput"
+                      placeholder="e.g. 14 acres, rural commercial, planning cottage development"></textarea>
+          </div>
+
+        </div><!-- /row -->
+
+        <div id="cl-error" class="cl-alert"></div>
+
+        <div class="d-flex align-items-center justify-content-between mt-3">
+          <span class="text-muted small"><i class="fas fa-database me-1"></i><span id="muniCount">…</span> municipalities across Canada</span>
+          <button type="submit" class="btn btn-canland" id="analyzeBtn">
+            <i class="fas fa-search me-2"></i>Analyze Property
+          </button>
         </div>
+      </form>
+
+      <!-- Leaflet map preview -->
+      <div id="propertyMap"></div>
     </div>
 
-    <div class="container">
-        <!-- Features Section -->
-        <div class="row mb-5">
-            <div class="col-md-4 mb-4">
-                <div class="card feature-card">
-                    <div class="card-body">
-                        <i class="fas fa-search-location feature-icon"></i>
-                        <h5 class="card-title">Property Analysis</h5>
-                        <p class="card-text">Parse addresses and legal descriptions to identify properties across Alberta municipalities.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="card feature-card">
-                    <div class="card-body">
-                        <i class="fas fa-building feature-icon"></i>
-                        <h5 class="card-title">Zoning Information</h5>
-                        <p class="card-text">Retrieve current zoning, permitted uses, and development requirements instantly.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="card feature-card">
-                    <div class="card-body">
-                        <i class="fas fa-file-pdf feature-icon"></i>
-                        <h5 class="card-title">Professional Reports</h5>
-                        <p class="card-text">Generate comprehensive PDF feasibility reports for your development projects.</p>
-                    </div>
-                </div>
-            </div>
+    <!-- ── STEP 2 — Loading ────────────────────────────────── -->
+    <div id="panelStep2" class="loading-panel">
+      <div class="spinner-border" role="status"></div>
+      <p>Analyzing property &amp; retrieving zoning data…</p>
+      <p class="text-muted" style="font-size:.83rem">Geocoding address · Matching municipality · Retrieving policies</p>
+    </div>
+
+    <!-- ── STEP 3 — Results ───────────────────────────────── -->
+    <div id="panelStep3" class="results-panel">
+
+      <!-- Summary row -->
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+        <div>
+          <h5 class="fw-bold mb-1" id="resMuniName">Municipality</h5>
+          <span class="text-muted small" id="resMuniProv"></span>
         </div>
-
-        <!-- Main Form Section -->
-        <div class="row">
-            <div class="col-lg-8 mx-auto">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h3 class="card-title mb-0">
-                            <i class="fas fa-clipboard-list me-2"></i>
-                            Property Information
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <form id="propertyForm">
-                            <div class="mb-4">
-                                <label for="address" class="form-label">
-                                    <i class="fas fa-map-marker-alt info-icon"></i>
-                                    Property Address
-                                </label>
-                                <input type="text" class="form-control" id="address" name="address" 
-                                       placeholder="e.g., 123 Main Street, Red Deer, AB or RR 1, Lacombe County">
-                                <div class="form-text">Enter the street address or rural address of the property</div>
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="legal_description" class="form-label">
-                                    <i class="fas fa-file-alt info-icon"></i>
-                                    Legal Description
-                                </label>
-                                <input type="text" class="form-control" id="legal_description" name="legal_description" 
-                                       placeholder="e.g., NE 12-45-26-W4M or Lot 1, Block 2, Plan 123456">
-                                <div class="form-text">Enter the legal land description (quarter section, lot/block, etc.)</div>
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="additional_info" class="form-label">
-                                    <i class="fas fa-info-circle info-icon"></i>
-                                    Additional Information
-                                </label>
-                                <textarea class="form-control" id="additional_info" name="additional_info" rows="4" 
-                                          placeholder="Paste email content or provide additional details about the property, development plans, acreage, etc."></textarea>
-                                <div class="form-text">Include any additional property details, development intentions, or relevant information</div>
-                            </div>
-
-                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                <button type="submit" class="btn btn-primary btn-lg">
-                                    <i class="fas fa-search me-2"></i>
-                                    Analyze Property
-                                </button>
-                            </div>
-                        </form>
-
-                        <!-- Loading Spinner -->
-                        <div class="loading-spinner text-center mt-4">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2">Analyzing property and retrieving land use information...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div id="resFeasBadge" class="feasibility-badge badge-unknown">
+          <i class="fas fa-circle-check"></i> Unknown
         </div>
+      </div>
 
-        <hr class="section-divider">
+      <div class="summary-grid" id="summaryGrid"></div>
 
-        <!-- Results Section -->
-        <div class="results-section">
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-success text-white">
-                            <h3 class="card-title mb-0">
-                                <i class="fas fa-chart-line me-2"></i>
-                                Analysis Results
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <!-- Feasibility Summary -->
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <h5><i class="fas fa-thumbs-up info-icon"></i>Development Potential</h5>
-                                    <span id="feasibility-badge" class="badge feasibility-high">High</span>
-                                </div>
-                                <div class="col-md-6">
-                                    <h5><i class="fas fa-building info-icon"></i>Municipality</h5>
-                                    <span id="municipality-name" class="fw-bold">Loading...</span>
-                                </div>
-                            </div>
+      <!-- Tabs -->
+      <ul class="nav nav-tabs result-tabs mt-3" id="resultTabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabZoning">Zoning</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabUses">Permitted Uses</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabStandards">Standards</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMuni">Municipality</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabActions">Next Steps</button></li>
+      </ul>
+      <div class="tab-content" id="resultTabContent">
 
-                            <!-- Property Details -->
-                            <div class="mb-4">
-                                <h5><i class="fas fa-home info-icon"></i>Property Information</h5>
-                                <div id="property-details" class="bg-light p-3 rounded">
-                                    Loading property details...
-                                </div>
-                            </div>
-
-                            <!-- Zoning Information -->
-                            <div class="mb-4">
-                                <h5><i class="fas fa-map info-icon"></i>Zoning & Land Use</h5>
-                                <div id="zoning-info" class="bg-light p-3 rounded">
-                                    Loading zoning information...
-                                </div>
-                            </div>
-
-                            <!-- Key Considerations -->
-                            <div class="mb-4">
-                                <h5><i class="fas fa-exclamation-triangle info-icon"></i>Key Considerations</h5>
-                                <ul id="key-considerations" class="list-group list-group-flush">
-                                    <li class="list-group-item">Loading considerations...</li>
-                                </ul>
-                            </div>
-
-                            <!-- Recommended Actions -->
-                            <div class="mb-4">
-                                <h5><i class="fas fa-tasks info-icon"></i>Recommended Next Steps</h5>
-                                <ol id="recommended-actions" class="list-group list-group-numbered">
-                                    <li class="list-group-item">Loading recommendations...</li>
-                                </ol>
-                            </div>
-
-                            <!-- Contact Information -->
-                            <div class="mb-4">
-                                <h5><i class="fas fa-phone info-icon"></i>Municipal Contact</h5>
-                                <div id="contact-info" class="bg-light p-3 rounded">
-                                    Loading contact information...
-                                </div>
-                            </div>
-
-                            <!-- Action Buttons -->
-                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                <button type="button" class="btn btn-success" id="generateReportBtn">
-                                    <i class="fas fa-file-pdf me-2"></i>
-                                    Generate PDF Report
-                                </button>
-                                <button type="button" class="btn btn-outline-primary" id="newAnalysisBtn">
-                                    <i class="fas fa-plus me-2"></i>
-                                    New Analysis
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <!-- Zoning tab -->
+        <div class="tab-pane fade show active" id="tabZoning">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="p-3 rounded-3" style="background:var(--cl-light); border:1px solid var(--cl-border)">
+                <div class="text-muted small fw-semibold mb-1">ZONING CLASSIFICATION</div>
+                <div class="fw-bold fs-5 text-navy" id="resZoning">—</div>
+              </div>
             </div>
-        </div>
-
-        <!-- Supported Municipalities Section -->
-        <div class="row mt-5">
+            <div class="col-md-6">
+              <div class="p-3 rounded-3" style="background:var(--cl-light); border:1px solid var(--cl-border)">
+                <div class="text-muted small fw-semibold mb-1">PROVINCE PLANNING ACT</div>
+                <div class="fw-semibold" id="resPlanningAct" style="font-size:.93rem">—</div>
+              </div>
+            </div>
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-map-marked info-icon"></i>
-                            Supported Municipalities
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">Currently supporting municipalities between Red Deer and Athabasca:</p>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>Cities & Towns</h6>
-                                <ul class="list-unstyled">
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Red Deer</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Edmonton</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Lacombe</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Wetaskiwin</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Camrose</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Athabasca</li>
-                                </ul>
-                            </div>
-                            <div class="col-md-6">
-                                <h6>Counties</h6>
-                                <ul class="list-unstyled">
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Lacombe County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Ponoka County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Wetaskiwin County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Camrose County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Leduc County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Strathcona County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Sturgeon County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Parkland County</li>
-                                    <li><i class="fas fa-check-circle text-success me-2"></i>Athabasca County</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+              <div class="text-muted small fw-semibold mb-1">LAND USE BYLAW REFERENCE</div>
+              <div id="resBylawLink">—</div>
             </div>
+            <div class="col-12">
+              <div class="text-muted small fw-semibold mb-1">DEVELOPMENT REQUIREMENTS</div>
+              <ul class="use-list" id="resDevReqs"></ul>
+            </div>
+          </div>
         </div>
+
+        <!-- Uses tab -->
+        <div class="tab-pane fade" id="tabUses">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2"><i class="fas fa-circle-check text-success me-1"></i>Permitted Uses</h6>
+              <ul class="use-list" id="resPermitted"></ul>
+            </div>
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2"><i class="fas fa-circle-exclamation text-warning me-1"></i>Discretionary Uses</h6>
+              <ul class="use-list" id="resDiscretionary"></ul>
+              <p class="text-muted small mt-2 mb-0">Discretionary uses require an application and approval from the municipality.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Standards tab -->
+        <div class="tab-pane fade" id="tabStandards">
+          <table class="standards-table">
+            <thead>
+              <tr><th>Standard</th><th>Requirement</th></tr>
+            </thead>
+            <tbody id="resStandardsBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Municipality tab -->
+        <div class="tab-pane fade" id="tabMuni">
+          <div class="contact-block" id="resMuniContact"></div>
+        </div>
+
+        <!-- Next steps tab -->
+        <div class="tab-pane fade" id="tabActions">
+          <p class="text-muted small mb-2">Based on the zoning analysis, we recommend the following actions:</p>
+          <ol class="action-list" id="resActionsList"></ol>
+          <div class="mt-3 p-3 rounded-3" style="background:#fffbe6; border:1px solid #ffe58f; font-size:.85rem">
+            <strong>Disclaimer:</strong> This analysis is preliminary and based on publicly available information.
+            Always verify with the municipal planning department before making development decisions.
+          </div>
+        </div>
+
+      </div><!-- /tab-content -->
+
+      <!-- Back + Report buttons -->
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-back" id="backToFormBtn"><i class="fas fa-arrow-left me-1"></i>New Analysis</button>
+        <button class="btn btn-report" id="goToReportBtn"><i class="fas fa-file-pdf me-2"></i>Generate Report</button>
+      </div>
+    </div><!-- /panelStep3 -->
+
+    <!-- ── STEP 4 — Report ────────────────────────────────── -->
+    <div id="panelStep4" style="display:none">
+      <h5 class="fw-bold mb-1"><i class="fas fa-file-pdf text-danger me-2"></i>Generate PDF Report</h5>
+      <p class="text-muted small mb-3">A professional, print-ready feasibility report will be generated and downloaded automatically.</p>
+
+      <div class="p-3 rounded-3 mb-3" style="background:var(--cl-light); border:1px solid var(--cl-border); font-size:.9rem">
+        The report includes:
+        <ul class="mt-2 mb-0" style="line-height:1.8">
+          <li>Executive Summary with feasibility rating</li>
+          <li>Property &amp; municipality details</li>
+          <li>Zoning classification and applicable bylaw</li>
+          <li>Permitted and discretionary uses</li>
+          <li>Development standards (setbacks, density, height)</li>
+          <li>Development requirements checklist</li>
+          <li>Recommended next steps</li>
+        </ul>
+      </div>
+
+      <div id="reportLoading" style="display:none" class="text-center py-3">
+        <div class="spinner-border spinner-border-sm text-success me-2"></div> Generating report…
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-back" id="backToResultsBtn"><i class="fas fa-arrow-left me-1"></i>Back to Results</button>
+        <button class="btn btn-report" id="downloadReportBtn"><i class="fas fa-download me-2"></i>Download PDF</button>
+      </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="mt-5 py-4 bg-dark text-light">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-8">
-                    <p class="mb-0">&copy; 2024 Alberta Land Use Feasibility Tool. For preliminary assessment purposes only.</p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <small>Always verify with municipal authorities</small>
-                </div>
-            </div>
+  </div><!-- /cl-card -->
+</div><!-- /wizard-wrapper -->
+
+<!-- ─── How It Works ─────────────────────────────────────────── -->
+<section id="how-it-works" style="background:#fff; padding:3rem 1rem; border-top:1px solid var(--cl-border)">
+  <div class="container" style="max-width:860px">
+    <h4 class="text-center fw-bold mb-4">How CanLand Works</h4>
+    <div class="row g-4 text-center">
+      <div class="col-md-3">
+        <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-2"
+             style="width:56px;height:56px;background:var(--cl-light)">
+          <i class="fas fa-location-dot fa-lg" style="color:var(--cl-blue)"></i>
         </div>
-    </footer>
+        <h6 class="fw-bold">1. Enter Property</h6>
+        <p class="text-muted small">Provide an address, legal description, or parcel details anywhere in Canada.</p>
+      </div>
+      <div class="col-md-3">
+        <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-2"
+             style="width:56px;height:56px;background:var(--cl-light)">
+          <i class="fas fa-magnifying-glass-location fa-lg" style="color:var(--cl-blue)"></i>
+        </div>
+        <h6 class="fw-bold">2. Auto-Match</h6>
+        <p class="text-muted small">We geocode the address and match it to the correct municipality and provincial zoning system.</p>
+      </div>
+      <div class="col-md-3">
+        <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-2"
+             style="width:56px;height:56px;background:var(--cl-light)">
+          <i class="fas fa-layer-group fa-lg" style="color:var(--cl-blue)"></i>
+        </div>
+        <h6 class="fw-bold">3. Zoning Analysis</h6>
+        <p class="text-muted small">Retrieve zoning classification, permitted uses, setbacks, density limits, and bylaw references.</p>
+      </div>
+      <div class="col-md-3">
+        <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-2"
+             style="width:56px;height:56px;background:var(--cl-light)">
+          <i class="fas fa-file-pdf fa-lg" style="color:var(--cl-blue)"></i>
+        </div>
+        <h6 class="fw-bold">4. Download Report</h6>
+        <p class="text-muted small">Export a professional PDF feasibility report ready for planners, investors, and consultants.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let currentAnalysisData = null;
+<!-- ─── Footer ───────────────────────────────────────────────── -->
+<footer class="cl-footer">
+  <strong style="color:rgba(255,255,255,.8)">CanLand</strong> — Canadian Land Use Feasibility Platform &nbsp;·&nbsp;
+  Covers all 10 provinces &amp; 3 territories &nbsp;·&nbsp;
+  For preliminary assessment only. Always verify with the municipal planning authority.
+</footer>
 
-        document.getElementById('propertyForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const data = {
-                address: formData.get('address'),
-                legal_description: formData.get('legal_description'),
-                additional_info: formData.get('additional_info')
-            };
+<!-- ── Scripts ──────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ================================================================
+   CanLand — Frontend Logic
+================================================================ */
 
-            // Show loading spinner
-            document.querySelector('.loading-spinner').style.display = 'block';
-            document.querySelector('.results-section').style.display = 'none';
+// State
+let analysisData = null;
+let leafletMap   = null;
+let leafletMarker = null;
 
-            try {
-                const response = await fetch('/api/analyze_property', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
+// ── DOM refs ──────────────────────────────────────────────────
+const provinceSelect  = document.getElementById('provinceSelect');
+const citySelect      = document.getElementById('citySelect');
+const addressInput    = document.getElementById('addressInput');
+const legalInput      = document.getElementById('legalInput');
+const additionalInput = document.getElementById('additionalInput');
+const analyzeBtn      = document.getElementById('analyzeBtn');
+const errorDiv        = document.getElementById('cl-error');
 
-                const result = await response.json();
+const panelStep1 = document.getElementById('panelStep1');
+const panelStep2 = document.getElementById('panelStep2');
+const panelStep3 = document.getElementById('panelStep3');
+const panelStep4 = document.getElementById('panelStep4');
 
-                if (response.ok) {
-                    currentAnalysisData = result;
-                    displayResults(result);
-                } else {
-                    throw new Error(result.error || 'Analysis failed');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            } finally {
-                document.querySelector('.loading-spinner').style.display = 'none';
-            }
-        });
+const stepBtns   = [
+  document.getElementById('step1Btn'),
+  document.getElementById('step2Btn'),
+  document.getElementById('step3Btn'),
+  document.getElementById('step4Btn'),
+];
 
-        function displayResults(data) {
-            // Update feasibility badge
-            const feasibilityBadge = document.getElementById('feasibility-badge');
-            const potential = data.feasibility_summary?.development_potential || 'Unknown';
-            feasibilityBadge.textContent = potential;
-            feasibilityBadge.className = `badge feasibility-${potential.toLowerCase()}`;
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadProvinces();
+  await loadMuniCount();
+  renderProvincePills();
+  showStep(0);
+});
 
-            // Update municipality
-            document.getElementById('municipality-name').textContent = 
-                data.municipality_info?.name || 'Not identified';
+// ── Provinces ─────────────────────────────────────────────────
+async function loadProvinces() {
+  try {
+    const res = await fetch('/api/provinces');
+    const provinces = await res.json();
+    provinces.forEach(p => {
+      const opt = new Option(`${p.name} (${p.city_count} cities)`, p.code);
+      provinceSelect.add(opt);
+    });
+  } catch(e) { console.error('Failed to load provinces', e); }
+}
 
-            // Update property details
-            const propertyDetails = document.getElementById('property-details');
-            const propInfo = data.property_info?.raw_input || {};
-            propertyDetails.innerHTML = `
-                <strong>Address:</strong> ${propInfo.address || 'Not provided'}<br>
-                <strong>Legal Description:</strong> ${propInfo.legal_description || 'Not provided'}<br>
-                ${data.property_info?.property_details?.acreage ? 
-                    `<strong>Acreage:</strong> ${data.property_info.property_details.acreage} acres<br>` : ''}
-                ${data.property_info?.coordinates ? 
-                    `<strong>Coordinates:</strong> ${data.property_info.coordinates.latitude.toFixed(6)}, ${data.property_info.coordinates.longitude.toFixed(6)}` : ''}
-            `;
+async function loadMuniCount() {
+  try {
+    const res = await fetch('/api/municipalities');
+    const list = await res.json();
+    document.getElementById('muniCount').textContent = list.length.toLocaleString();
+  } catch(e) {
+    document.getElementById('muniCount').textContent = '88+';
+  }
+}
 
-            // Update zoning info
-            const zoningInfo = document.getElementById('zoning-info');
-            const policyInfo = data.policy_info || {};
-            zoningInfo.innerHTML = `
-                <strong>Current Zoning:</strong> ${policyInfo.zoning || 'Not determined'}<br>
-                ${policyInfo.permitted_uses?.length ? 
-                    `<strong>Permitted Uses:</strong> ${policyInfo.permitted_uses.join(', ')}<br>` : ''}
-                ${policyInfo.discretionary_uses?.length ? 
-                    `<strong>Discretionary Uses:</strong> ${policyInfo.discretionary_uses.join(', ')}` : ''}
-            `;
+function renderProvincePills() {
+  const pills = ['BC','AB','SK','MB','ON','QC','NB','NS','PE','NL','YT','NT','NU'];
+  const container = document.getElementById('provincePills');
+  pills.forEach(p => {
+    const el = document.createElement('span');
+    el.className = 'pill';
+    el.textContent = p;
+    container.appendChild(el);
+  });
+}
 
-            // Update key considerations
-            const considerations = document.getElementById('key-considerations');
-            const keyConsiderations = data.feasibility_summary?.key_considerations || [];
-            considerations.innerHTML = keyConsiderations.length ? 
-                keyConsiderations.map(item => `<li class="list-group-item">${item}</li>`).join('') :
-                '<li class="list-group-item">No specific considerations identified</li>';
+// Province → city cascade
+provinceSelect.addEventListener('change', async () => {
+  const code = provinceSelect.value;
+  citySelect.innerHTML = '<option value="">Loading…</option>';
+  citySelect.disabled = true;
 
-            // Update recommended actions
-            const actions = document.getElementById('recommended-actions');
-            const recommendedActions = data.feasibility_summary?.recommended_actions || [];
-            actions.innerHTML = recommendedActions.length ?
-                recommendedActions.map((item, index) => `<li class="list-group-item">${item}</li>`).join('') :
-                '<li class="list-group-item">Consult with municipal planning department</li>';
+  if (!code) {
+    citySelect.innerHTML = '<option value="">— Select Province first —</option>';
+    return;
+  }
 
-            // Update contact info
-            const contactInfo = document.getElementById('contact-info');
-            const contact = data.municipality_info?.contact_info || {};
-            contactInfo.innerHTML = `
-                ${contact.phone ? `<strong>Phone:</strong> ${contact.phone}<br>` : ''}
-                ${contact.address ? `<strong>Address:</strong> ${contact.address}<br>` : ''}
-                ${data.municipality_info?.planning_dept ? 
-                    `<strong>Planning Department:</strong> ${data.municipality_info.planning_dept}<br>` : ''}
-                ${data.municipality_info?.website ? 
-                    `<strong>Website:</strong> <a href="${data.municipality_info.website}" target="_blank">${data.municipality_info.website}</a>` : ''}
-            `;
+  try {
+    const res = await fetch(`/api/cities/${code}`);
+    const cities = await res.json();
+    citySelect.innerHTML = '<option value="">— All / Auto-detect —</option>';
+    cities.forEach(c => {
+      const opt = new Option(`${c.name} (${c.type})`, c.name);
+      citySelect.add(opt);
+    });
+    citySelect.disabled = false;
+  } catch(e) {
+    citySelect.innerHTML = '<option value="">Error loading cities</option>';
+  }
+});
 
-            // Show results section
-            document.querySelector('.results-section').style.display = 'block';
-            
-            // Scroll to results
-            document.querySelector('.results-section').scrollIntoView({ behavior: 'smooth' });
-        }
+// ── Step management ───────────────────────────────────────────
+function showStep(idx) {
+  [panelStep1, panelStep2, panelStep3, panelStep4].forEach((p, i) => {
+    p.style.display = i === idx ? '' : 'none';
+    if (p.classList.contains('results-panel') || p.classList.contains('loading-panel')) {
+      p.style.display = i === idx ? 'block' : 'none';
+    }
+  });
+  stepBtns.forEach((btn, i) => {
+    btn.classList.remove('active','done');
+    if (i < idx)  btn.classList.add('done');
+    if (i === idx) btn.classList.add('active');
+  });
+}
 
-        // Generate PDF report
-        document.getElementById('generateReportBtn').addEventListener('click', async function() {
-            if (!currentAnalysisData) {
-                alert('No analysis data available. Please run an analysis first.');
-                return;
-            }
+// ── Form submit ───────────────────────────────────────────────
+document.getElementById('propertyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideError();
 
-            try {
-                const response = await fetch('/api/generate_report', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(currentAnalysisData)
-                });
+  const address = addressInput.value.trim();
+  const legal   = legalInput.value.trim();
+  const info    = additionalInput.value.trim();
+  const prov    = provinceSelect.value;
+  const city    = citySelect.value;
 
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = `land_use_report_${new Date().toISOString().slice(0,10)}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                } else {
-                    throw new Error('Failed to generate report');
-                }
-            } catch (error) {
-                alert('Error generating report: ' + error.message);
-            }
-        });
+  if (!address && !legal && !info && !city) {
+    showError('Please provide at least a street address, legal description, or select a city.');
+    return;
+  }
 
-        // New analysis button
-        document.getElementById('newAnalysisBtn').addEventListener('click', function() {
-            document.getElementById('propertyForm').reset();
-            document.querySelector('.results-section').style.display = 'none';
-            currentAnalysisData = null;
-            document.querySelector('form').scrollIntoView({ behavior: 'smooth' });
-        });
-    </script>
+  showStep(1); // loading
+
+  try {
+    const res  = await fetch('/api/analyze_property', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, legal_description: legal, additional_info: info, province: prov, city })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showStep(0);
+      showError(data.error || 'Analysis failed. Please check your inputs and try again.');
+      return;
+    }
+
+    analysisData = data;
+    renderResults(data);
+    showStep(2);
+
+  } catch(err) {
+    showStep(0);
+    showError('Network error. Please try again.');
+  }
+});
+
+// ── Render results ────────────────────────────────────────────
+function renderResults(data) {
+  const muni   = data.municipality_info  || {};
+  const policy = data.policy_info        || {};
+  const feas   = data.feasibility_summary || {};
+
+  // Header
+  document.getElementById('resMuniName').textContent = muni.name || 'Unknown Municipality';
+  document.getElementById('resMuniProv').textContent =
+    `${muni.province_name || ''} ${muni.province ? '('+muni.province+')' : ''}`;
+
+  // Feasibility badge
+  const pot  = feas.development_potential || 'Unknown';
+  const badge = document.getElementById('resFeasBadge');
+  badge.className = 'feasibility-badge badge-' + pot.toLowerCase();
+  badge.innerHTML = `<i class="fas fa-circle-check"></i> ${pot} Potential`;
+
+  // Summary grid
+  const prop = data.property_info || {};
+  const raw  = prop.raw_input || {};
+  const det  = prop.property_details || {};
+  const grid = document.getElementById('summaryGrid');
+  grid.innerHTML = '';
+  const cards = [
+    { label: 'Province', value: muni.province_name || '—' },
+    { label: 'Zoning', value: policy.zoning_code || '—' },
+    { label: 'Municipality Type', value: cap(muni.type) || '—' },
+    { label: 'Acreage', value: det.acreage ? det.acreage + ' acres' : '—' },
+  ];
+  if (muni.population) cards.push({ label: 'Population', value: muni.population.toLocaleString() });
+  if (muni.distance_km !== undefined) cards.push({ label: 'Distance Match', value: muni.distance_km + ' km' });
+  cards.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'summary-card';
+    el.innerHTML = `<div class="sc-label">${c.label}</div><div class="sc-value">${c.value}</div>`;
+    grid.appendChild(el);
+  });
+
+  // Zoning tab
+  document.getElementById('resZoning').textContent = policy.zoning || '—';
+  document.getElementById('resPlanningAct').textContent = muni.planning_act || '—';
+
+  const bylawDiv = document.getElementById('resBylawLink');
+  const bylaw = policy.land_use_bylaw;
+  if (bylaw && bylaw.url) {
+    bylawDiv.innerHTML = `<a href="${bylaw.url}" target="_blank" class="text-primary small">
+      <i class="fas fa-external-link-alt me-1"></i>${bylaw.title || 'View Land Use Bylaw'}
+    </a>`;
+  } else { bylawDiv.textContent = '—'; }
+
+  const devReqs = document.getElementById('resDevReqs');
+  devReqs.innerHTML = '';
+  (policy.development_requirements || []).forEach(r => {
+    const li = document.createElement('li');
+    li.innerHTML = `<i class="fas fa-check use-icon"></i>${r}`;
+    devReqs.appendChild(li);
+  });
+
+  // Uses tab
+  renderUseList('resPermitted', policy.permitted_uses || [], 'use-icon fas fa-check');
+  renderUseList('resDiscretionary', policy.discretionary_uses || [], 'dis-icon fas fa-circle-exclamation');
+
+  // Standards tab
+  const body = document.getElementById('resStandardsBody');
+  body.innerHTML = '';
+  const setbacks  = policy.setbacks || {};
+  const density   = policy.density_restrictions || {};
+  const height    = policy.height_restrictions || {};
+  const allStds = [
+    ...Object.entries(setbacks).map(([k, v])  => [`${cap(k)} Setback`, v]),
+    ...Object.entries(density).map(([k, v])   => [formatKey(k), v]),
+    ...Object.entries(height).map(([k, v])    => [formatKey(k), v]),
+  ];
+  allStds.forEach(([k, v]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="fw-semibold" style="color:#555">${k}</td><td>${v}</td>`;
+    body.appendChild(tr);
+  });
+  if (!allStds.length) {
+    body.innerHTML = '<tr><td colspan="2" class="text-muted">No standards data available.</td></tr>';
+  }
+
+  // Municipality tab
+  const ci = muni.contact_info || {};
+  document.getElementById('resMuniContact').innerHTML = `
+    <h6 class="fw-bold mb-2">${muni.name}</h6>
+    ${ci.phone   ? `<div class="contact-item"><i class="fas fa-phone"></i>${ci.phone}</div>` : ''}
+    ${ci.address ? `<div class="contact-item"><i class="fas fa-map-marker-alt"></i>${ci.address}</div>` : ''}
+    ${muni.planning_dept ? `<div class="contact-item"><i class="fas fa-envelope"></i>
+      <a href="mailto:${muni.planning_dept}">${muni.planning_dept}</a></div>` : ''}
+    ${muni.website ? `<div class="contact-item"><i class="fas fa-globe"></i>
+      <a href="${muni.website}" target="_blank">${muni.website}</a></div>` : ''}
+    ${muni.land_use_bylaw ? `<div class="contact-item"><i class="fas fa-book"></i>
+      <a href="${muni.land_use_bylaw}" target="_blank">Land Use Bylaw</a></div>` : ''}
+    <hr style="margin:.75rem 0" />
+    <div class="row g-2 text-muted small">
+      <div class="col-6"><strong>Building Code:</strong><br>${muni.building_code || 'National Building Code'}</div>
+      <div class="col-6"><strong>Planning Act:</strong><br>${muni.planning_act || '—'}</div>
+    </div>
+    ${muni.typical_processing_times ? `
+    <hr style="margin:.75rem 0" />
+    <div class="text-muted small"><strong>Typical Processing Times</strong>
+      <ul class="mt-1 mb-0">
+        <li>Development permit: ${muni.typical_processing_times.development_permit}</li>
+        <li>Subdivision: ${muni.typical_processing_times.subdivision}</li>
+        <li>Rezoning: ${muni.typical_processing_times.rezoning}</li>
+      </ul>
+    </div>` : ''}
+  `;
+
+  // Actions tab
+  const actionsList = document.getElementById('resActionsList');
+  actionsList.innerHTML = '';
+  const allActions = [
+    ...(feas.recommended_actions || []),
+    ...(feas.key_considerations || []).map(c => `Review: ${c}`),
+  ];
+  allActions.forEach((a, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="action-num">${i+1}</span><span>${a}</span>`;
+    actionsList.appendChild(li);
+  });
+
+  // Map
+  showMap(data);
+}
+
+function renderUseList(id, items, iconClass) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  items.forEach(item => {
+    const li = document.createElement('li');
+    li.innerHTML = `<i class="${iconClass}"></i>${item}`;
+    el.appendChild(li);
+  });
+  if (!items.length) {
+    el.innerHTML = '<li>—</li>';
+  }
+}
+
+// ── Map ───────────────────────────────────────────────────────
+function showMap(data) {
+  const coords = data.property_info?.coordinates;
+  const muniCoords = data.municipality_info?.coordinates;
+  const target = coords
+    ? [coords.latitude, coords.longitude]
+    : muniCoords ? [muniCoords.lat, muniCoords.lon] : null;
+
+  if (!target) return;
+
+  const mapEl = document.getElementById('propertyMap');
+  mapEl.style.display = 'block';
+
+  if (leafletMap) {
+    leafletMap.remove();
+    leafletMap = null;
+    leafletMarker = null;
+  }
+
+  leafletMap = L.map('propertyMap', { zoomControl: true }).setView(target, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(leafletMap);
+
+  const label = data.municipality_info?.name || 'Property Location';
+  L.marker(target)
+    .addTo(leafletMap)
+    .bindPopup(`<b>${label}</b><br>${data.municipality_info?.province_name || ''}`)
+    .openPopup();
+}
+
+// ── Navigation ────────────────────────────────────────────────
+document.getElementById('backToFormBtn').addEventListener('click', () => {
+  showStep(0);
+});
+document.getElementById('goToReportBtn').addEventListener('click', () => {
+  showStep(3);
+});
+document.getElementById('backToResultsBtn').addEventListener('click', () => {
+  showStep(2);
+});
+
+document.getElementById('downloadReportBtn').addEventListener('click', async () => {
+  if (!analysisData) return;
+  const btn = document.getElementById('downloadReportBtn');
+  const loading = document.getElementById('reportLoading');
+  btn.disabled = true;
+  loading.style.display = 'block';
+
+  try {
+    const res = await fetch('/api/generate_report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(analysisData)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Report generation failed: ' + (err.error || 'Unknown error'));
+      return;
+    }
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `CanLand_Report_${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Mark step 4 done
+    stepBtns[3].classList.remove('active');
+    stepBtns[3].classList.add('done');
+
+  } catch(err) {
+    alert('Network error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    loading.style.display = 'none';
+  }
+});
+
+// ── Helpers ───────────────────────────────────────────────────
+function showError(msg) {
+  errorDiv.style.display = 'block';
+  errorDiv.innerHTML = `<i class="fas fa-circle-exclamation me-2"></i>${msg}`;
+}
+function hideError() {
+  errorDiv.style.display = 'none';
+}
+function cap(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+function formatKey(key) {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+</script>
 </body>
 </html>
