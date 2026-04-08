@@ -1,746 +1,296 @@
-import re
+"""
+Policy retrieval for CanLand.
+
+IMPORTANT — Honest preliminary mode (Option A):
+
+This module DOES NOT retrieve real zoning data. It used to invent a zoning code,
+setbacks, height limits, and a permitted-use list for every property based on
+hardcoded templates. That produced confidently wrong reports for every address.
+
+Until per-municipality zoning APIs are wired in (see OPTION_B_TODO.md), this
+module returns only:
+
+  - Municipality identification (name, province, contact info)
+  - A link to the municipality's land use bylaw (when known)
+  - Generic, province-aware development requirements (building code, planning act)
+  - A clear "verification required" flag and verification steps
+
+Anything that would require actually knowing the parcel's zone — the zone code,
+permitted uses, setbacks, density, height limits — is intentionally returned as
+empty / None. The UI and PDF render these as "Not retrieved — verify with the
+municipal planning department."
+"""
+
+import hashlib
+import json
+import logging
 import time
 from typing import Dict, List, Optional
 
+from zoning_providers import ProviderError, ZoningResult, get_provider
+
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
-# Province-specific zoning classification systems
+# Province → (building code, planning act) lookup
 # ---------------------------------------------------------------------------
 
-PROVINCE_ZONING = {
-    "BC": {
-        "residential": {
-            "RS-1": "Single Family Residential",
-            "RS-2": "Single Family Residential (Larger Lot)",
-            "RT-1": "Two-Family / Duplex Residential",
-            "RM-1": "Low-Density Multi-Family",
-            "RM-3": "Medium-Density Multi-Family",
-            "RM-5": "High-Density Multi-Family",
-            "CD-1": "Comprehensive Development",
-        },
-        "commercial": {
-            "C-1": "Neighbourhood Commercial",
-            "C-2": "District Commercial",
-            "C-3A": "Downtown Commercial",
-            "CV": "Commercial / Village",
-        },
-        "industrial": {
-            "I-1": "Light Industrial",
-            "I-2": "General Industrial",
-            "M-2": "Industrial (Manufacturing)",
-        },
-        "rural": {
-            "A-1": "General Agricultural",
-            "A-2": "Agricultural / Residential",
-            "CR-1": "Country Residential",
-        },
-        "special": {
-            "P-1": "Civic / Institutional",
-            "OS": "Open Space",
-            "HA": "Historic Area",
-        },
-    },
-    "AB": {
-        "residential": {
-            "R-1": "Single Family Residential",
-            "R-2": "Low Density Residential",
-            "R-3": "Multi-Family Residential",
-            "R-4": "Apartment Residential",
-            "MH": "Mobile Home Residential",
-        },
-        "commercial": {
-            "C-1": "Neighbourhood Commercial",
-            "C-2": "Community Commercial",
-            "C-3": "Highway Commercial",
-            "C-4": "Downtown Commercial",
-        },
-        "industrial": {
-            "I-1": "Light Industrial",
-            "I-2": "General Industrial",
-            "I-3": "Heavy Industrial",
-        },
-        "rural": {
-            "AG": "Agricultural",
-            "CR": "Country Residential",
-            "RUR": "Rural Residential",
-            "RC": "Rural Commercial",
-        },
-        "special": {
-            "P": "Public / Institutional",
-            "OS": "Open Space",
-            "PUD": "Planned Unit Development",
-            "DC": "Direct Control",
-        },
-    },
-    "SK": {
-        "residential": {
-            "R1": "Single Family Residential",
-            "R2": "Two-Family Residential",
-            "R3": "Multi-Family Residential",
-            "R4": "High-Density Residential",
-        },
-        "commercial": {
-            "C1": "Neighbourhood Commercial",
-            "C2": "General Commercial",
-            "C3": "Highway / Regional Commercial",
-        },
-        "industrial": {
-            "M1": "Light Industrial",
-            "M2": "General Industrial",
-            "M3": "Heavy Industrial",
-        },
-        "rural": {
-            "AG": "Agricultural",
-            "RR": "Rural Residential",
-            "RC": "Rural Commercial",
-        },
-        "special": {
-            "P": "Public / Institutional",
-            "OS": "Open Space",
-        },
-    },
-    "MB": {
-        "residential": {
-            "R1": "Single Family Residential",
-            "R2": "Two-Family Residential",
-            "R3": "Multiple Dwelling",
-            "RM": "Residential Mixed",
-        },
-        "commercial": {
-            "C1": "Convenience Commercial",
-            "C2": "Community Commercial",
-            "C3": "Regional Commercial",
-        },
-        "industrial": {
-            "M1": "Light Manufacturing",
-            "M2": "General Industrial",
-        },
-        "rural": {
-            "AG": "Agricultural",
-            "RR": "Rural Residential",
-        },
-        "special": {
-            "P": "Public / Institutional",
-            "PR": "Parks and Recreation",
-        },
-    },
-    "ON": {
-        "residential": {
-            "R": "Residential",
-            "R1": "Low-Density Residential",
-            "R2": "Medium-Density Residential",
-            "R3": "High-Density Residential",
-            "RR": "Rural Residential",
-        },
-        "commercial": {
-            "C": "Commercial",
-            "C1": "Local Commercial",
-            "C2": "General Commercial",
-            "MU": "Mixed Use",
-        },
-        "industrial": {
-            "E": "Employment",
-            "E1": "Light Industrial / Employment",
-            "M": "Industrial",
-        },
-        "rural": {
-            "RU": "Rural",
-            "AG": "Agricultural",
-            "EP": "Environmental Protection",
-        },
-        "special": {
-            "OS": "Open Space",
-            "I": "Institutional",
-            "FD": "Future Development",
-        },
-    },
-    "QC": {
-        "residential": {
-            "H": "Habitation (Residential)",
-            "H1": "Faible densité (Low Density)",
-            "H2": "Densité moyenne (Medium Density)",
-            "H3": "Forte densité (High Density)",
-        },
-        "commercial": {
-            "C": "Commercial",
-            "CA": "Artère commerciale (Commercial Arterial)",
-            "CC": "Centre-ville (Downtown)",
-        },
-        "industrial": {
-            "I": "Industriel",
-            "IL": "Industriel léger (Light Industrial)",
-            "IG": "Industriel général (General Industrial)",
-        },
-        "rural": {
-            "A": "Agricole (Agricultural)",
-            "AR": "Agri-résidentiel",
-        },
-        "special": {
-            "P": "Public",
-            "VE": "Vert / espaces ouverts (Green / Open Space)",
-        },
-    },
-    "NB": {
-        "residential": {
-            "R1": "Single Unit Dwelling",
-            "R2": "Two-Unit Dwelling",
-            "R3": "Multiple Unit Dwelling",
-        },
-        "commercial": {
-            "C1": "Local Commercial",
-            "C2": "General Commercial",
-            "C3": "Highway Commercial",
-        },
-        "industrial": {
-            "I1": "Light Industrial",
-            "I2": "General Industrial",
-        },
-        "rural": {
-            "RR": "Rural Residential",
-            "A": "Agricultural",
-        },
-        "special": {
-            "P": "Public / Institutional",
-            "OS": "Open Space",
-        },
-    },
-    "NS": {
-        "residential": {
-            "R-1": "Single Unit Residential",
-            "R-2": "General Residential",
-            "R-3": "Multi-Unit Residential",
-            "MR": "Mixed Residential",
-        },
-        "commercial": {
-            "C-1": "General Business",
-            "C-2": "Community Commercial",
-            "MU": "Mixed Use",
-        },
-        "industrial": {
-            "I-1": "Light Industrial",
-            "I-2": "Heavy Industrial",
-        },
-        "rural": {
-            "RU": "Rural",
-            "A": "Agricultural",
-        },
-        "special": {
-            "P": "Public / Institutional",
-            "OS": "Open Space",
-        },
-    },
-    "PE": {
-        "residential": {
-            "R1": "Low Density Residential",
-            "R2": "Medium Density Residential",
-            "R3": "High Density Residential",
-        },
-        "commercial": {
-            "C": "Commercial",
-            "C1": "Central Business",
-            "C2": "General Commercial",
-        },
-        "industrial": {
-            "I": "Industrial",
-        },
-        "rural": {
-            "A": "Agricultural",
-            "RR": "Rural Residential",
-            "MR": "Marine Residential",
-        },
-        "special": {
-            "P": "Public",
-            "OS": "Open Space",
-        },
-    },
-    "NL": {
-        "residential": {
-            "R1": "Low Density Residential",
-            "R2": "Medium Density Residential",
-            "R3": "High Density Residential",
-        },
-        "commercial": {
-            "C1": "Local Commercial",
-            "C2": "General Commercial",
-        },
-        "industrial": {
-            "I1": "Light Industrial",
-            "I2": "General Industrial",
-        },
-        "rural": {
-            "RR": "Rural Residential",
-            "A": "Agricultural",
-        },
-        "special": {
-            "P": "Institutional",
-            "OS": "Open Space / Recreation",
-        },
-    },
-    "YT": {
-        "residential": {
-            "RS": "Single Residential",
-            "RR": "Rural Residential",
-            "RM": "Multiple Residential",
-        },
-        "commercial": {
-            "C": "Commercial",
-            "CG": "General Commercial",
-        },
-        "industrial": {
-            "I": "Industrial",
-        },
-        "rural": {
-            "CR": "Country Residential",
-            "AG": "Agricultural",
-        },
-        "special": {
-            "P": "Public",
-            "OS": "Open Space",
-        },
-    },
-    "NT": {
-        "residential": {
-            "R1": "Low Density Residential",
-            "R2": "Medium Density Residential",
-        },
-        "commercial": {
-            "C1": "Downtown Commercial",
-            "C2": "General Commercial",
-        },
-        "industrial": {
-            "I1": "Light Industrial",
-            "I2": "General Industrial",
-        },
-        "rural": {
-            "RR": "Rural Residential",
-            "AG": "Agricultural",
-        },
-        "special": {
-            "P": "Public",
-        },
-    },
-    "NU": {
-        "residential": {
-            "R1": "Residential",
-            "R2": "Multi-Unit Residential",
-        },
-        "commercial": {
-            "C1": "Commercial",
-        },
-        "industrial": {
-            "I1": "Industrial",
-        },
-        "rural": {
-            "RR": "Rural",
-        },
-        "special": {
-            "P": "Public / Institutional",
-        },
-    },
+PROVINCE_LEGISLATION = {
+    "BC": ("BC Building Code", "Local Government Act"),
+    "AB": ("Alberta Building Code", "Municipal Government Act"),
+    "SK": ("National Building Code", "Planning and Development Act"),
+    "MB": ("Manitoba Building Code", "The Planning Act"),
+    "ON": ("Ontario Building Code", "Planning Act"),
+    "QC": ("Code de construction du Québec", "Loi sur l'aménagement et l'urbanisme"),
+    "NB": ("National Building Code", "Community Planning Act"),
+    "NS": ("Nova Scotia Building Code", "Municipal Government Act"),
+    "PE": ("National Building Code", "Planning Act"),
+    "NL": ("National Building Code", "Urban and Rural Planning Act"),
+    "YT": ("National Building Code", "Municipal Act"),
+    "NT": ("National Building Code", "Cities, Towns and Villages Act"),
+    "NU": ("National Building Code", "Nunavut Planning Act"),
 }
 
-# ---------------------------------------------------------------------------
-# Setback templates (keyed by zone category)
-# ---------------------------------------------------------------------------
 
-SETBACK_TEMPLATES = {
-    "residential_low": {"front": "6.0 m", "rear": "6.0 m", "side": "1.5 m"},
-    "residential_high": {"front": "6.0 m", "rear": "7.5 m", "side": "3.0 m"},
-    "commercial": {"front": "3.0 m", "rear": "6.0 m", "side": "3.0 m"},
-    "industrial": {"front": "9.0 m", "rear": "4.5 m", "side": "4.5 m"},
-    "rural": {"front": "30.0 m", "rear": "15.0 m", "side": "15.0 m"},
-    "rural_commercial": {"front": "15.0 m", "rear": "15.0 m", "side": "7.5 m"},
-}
-
-DENSITY_TEMPLATES = {
-    "residential_low": {
-        "maximum_site_coverage": "40%",
-        "minimum_lot_size": "450 m²",
-        "maximum_dwelling_units": "1 per lot",
-    },
-    "residential_high": {
-        "maximum_site_coverage": "60%",
-        "minimum_lot_size": "300 m²",
-        "maximum_floor_area_ratio": "2.5",
-    },
-    "commercial": {
-        "maximum_site_coverage": "80%",
-        "minimum_lot_size": "250 m²",
-        "maximum_floor_area_ratio": "3.0",
-    },
-    "industrial": {
-        "maximum_site_coverage": "60%",
-        "minimum_lot_size": "2,000 m²",
-    },
-    "rural": {
-        "maximum_site_coverage": "25%",
-        "minimum_lot_size": "2 ha",
-        "maximum_dwelling_units": "1 per lot",
-    },
-    "rural_commercial": {
-        "maximum_site_coverage": "40%",
-        "minimum_lot_size": "1 ha",
-        "maximum_floor_area_ratio": "0.5",
-    },
-}
-
-HEIGHT_TEMPLATES = {
-    "residential_low": {"maximum_height": "9.0 m", "maximum_stories": "2.5"},
-    "residential_high": {"maximum_height": "20.0 m", "maximum_stories": "6"},
-    "commercial": {"maximum_height": "15.0 m", "maximum_stories": "4"},
-    "industrial": {"maximum_height": "12.0 m", "maximum_stories": "3"},
-    "rural": {"maximum_height": "10.0 m", "maximum_stories": "2"},
-    "rural_commercial": {"maximum_height": "12.0 m", "maximum_stories": "3"},
-}
-
-# ---------------------------------------------------------------------------
-# Permitted / discretionary use templates per zone type
-# ---------------------------------------------------------------------------
-
-PERMITTED_USES = {
-    "residential_low": [
-        "Single detached dwelling",
-        "Home-based business (minor)",
-        "Accessory buildings and structures",
-        "Parks and playgrounds",
-    ],
-    "residential_high": [
-        "Multiple unit dwellings (apartments, condominiums)",
-        "Townhouses and row housing",
-        "Home-based business (minor)",
-        "Supportive housing",
-        "Child care facilities",
-    ],
-    "commercial": [
-        "Retail stores",
-        "Restaurants and food services",
-        "Office buildings",
-        "Personal services",
-        "Financial institutions",
-        "Hotels and motels",
-    ],
-    "industrial": [
-        "Light manufacturing",
-        "Warehousing and storage",
-        "Service and repair shops",
-        "Research and development facilities",
-    ],
-    "rural": [
-        "Single detached dwelling",
-        "Home occupation",
-        "Agricultural uses",
-        "Accessory buildings",
-        "Hobby farms",
-    ],
-    "rural_commercial": [
-        "Tourist accommodation",
-        "Recreation facilities",
-        "Small-scale retail",
-        "Restaurants",
-        "Bed and breakfast",
-        "Campgrounds",
-    ],
-}
-
-DISCRETIONARY_USES = {
-    "residential_low": [
-        "Secondary suite / garden suite",
-        "Bed and breakfast",
-        "Licensed day care",
-        "Small-scale religious assembly",
-    ],
-    "residential_high": [
-        "Live-work units",
-        "Group care facilities",
-        "Senior living and long-term care",
-    ],
-    "commercial": [
-        "Drive-through services",
-        "Automotive service stations",
-        "Outdoor storage",
-        "Recreational vehicle parks",
-    ],
-    "industrial": [
-        "Caretaker dwelling",
-        "Commercial uses accessory to industrial",
-        "Renewable energy generation",
-    ],
-    "rural": [
-        "Bed and breakfast",
-        "Secondary suite",
-        "Small-scale tourism",
-        "Farm-based retail / agri-tourism",
-    ],
-    "rural_commercial": [
-        "Cottage/cabin resort development",
-        "RV and campsite parks",
-        "Event and conference facilities",
-        "Equestrian facilities",
-    ],
-}
+VERIFICATION_STEPS = [
+    "Look up the parcel on the municipality's online zoning map (link above).",
+    "Contact the planning department directly using the contact information shown below.",
+    "Request a Letter of Compliance or Zoning Memo for the legal title before relying on any zone designation.",
+    "Confirm the current land use bylaw version — bylaws are amended frequently.",
+    "If proceeding with development, engage a qualified land use planner familiar with the municipality.",
+]
 
 
 class PolicyRetrieval:
-    """Retrieve land use policies and zoning for Canadian municipalities."""
+    """
+    Return municipality + bylaw context for a property.
+
+    This class does NOT retrieve parcel-level zoning. It returns enough
+    information for the user to find that themselves, plus a flag making
+    clear that verification is required.
+    """
 
     def __init__(self):
-        self.policy_cache: Dict = {}
+        self.policy_cache: Dict[str, Dict] = {}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def get_land_use_policies(self, municipality_info: Dict, property_info: Dict) -> Dict:
-        """
-        Return zoning and policy info for a property in a given municipality.
-        """
-        muni_name = municipality_info.get("name", "")
-        cache_key = f"{muni_name}_{id(property_info)}"
+        cache_key = self._cache_key(municipality_info, property_info)
         if cache_key in self.policy_cache:
             return self.policy_cache[cache_key]
 
-        province = municipality_info.get("province", "AB")
-        zoning_system = PROVINCE_ZONING.get(province, PROVINCE_ZONING["AB"])
+        muni_name = municipality_info.get("name", "")
+        province = municipality_info.get("province") or None
 
+        building_code, planning_act = PROVINCE_LEGISLATION.get(
+            province or "", ("National Building Code of Canada", "Provincial Planning Legislation")
+        )
+
+        bylaw = self._get_bylaw_info(municipality_info)
+
+        # Start from the verification-required (Option A) base. If a real
+        # zoning provider is available for this municipality and we have
+        # coordinates, we'll upgrade the relevant fields below.
         policy_info: Dict = {
             "municipality": muni_name,
             "province": province,
+
+            # --- Verification status (may be upgraded by a provider hit) ---
+            "verification_required": True,
+            "verification_status": "unverified",   # unverified | verified | provider_failed | outside_coverage
+            "verification_message": None,
+            "zoning_status": (
+                "Not retrieved. Parcel-level zoning must be verified directly "
+                "with the municipal planning department."
+            ),
+
+            # --- Parcel-level fields (filled in by provider on success) ---
             "zoning": None,
             "zoning_code": None,
             "zone_category": None,
-            "land_use_bylaw": None,
+            "zone_overlays": [],
+            "zone_source": None,
+            "zone_source_url": None,
+            "zone_retrieved_at": None,
+            "zone_bylaw_section_url": None,
+            "zone_provider_notes": [],
+
+            # Permitted/discretionary uses, setbacks, density, height — we
+            # still do not fabricate these. Even with a real zone code, the
+            # actual numbers live in bylaw text and depend on overlays,
+            # exceptions, and discretionary variances. The user is sent to
+            # the linked bylaw section for the real values.
             "permitted_uses": [],
             "discretionary_uses": [],
             "setbacks": {},
             "density_restrictions": {},
             "height_restrictions": {},
             "special_provisions": [],
-            "development_requirements": [],
+
+            # --- Generic, verifiable references ---
+            "land_use_bylaw": bylaw,
+            "bylaw_links": [bylaw["url"]] if bylaw and bylaw.get("url") else [],
+            "development_requirements": self._get_dev_requirements(province, building_code, planning_act),
+            "verification_steps": VERIFICATION_STEPS,
             "contact_info": municipality_info.get("contact_info", {}),
-            "bylaw_links": [],
+
             "last_updated": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
 
-        try:
-            zoning = self._determine_zoning(province, zoning_system, property_info)
-            policy_info.update(zoning)
+        self._try_upgrade_with_provider(policy_info, municipality_info, property_info)
 
-            bylaw = self._get_bylaw_info(municipality_info)
-            if bylaw:
-                policy_info["land_use_bylaw"] = bylaw
-
-            policy_info["development_requirements"] = self._get_dev_requirements(
-                municipality_info, policy_info.get("zone_category", "")
-            )
-
-            self.policy_cache[cache_key] = policy_info
-        except Exception as exc:
-            policy_info["error"] = f"Error retrieving policy information: {exc}"
-
+        self.policy_cache[cache_key] = policy_info
         return policy_info
 
     # ------------------------------------------------------------------
-    # Zoning determination
+    # Provider integration
     # ------------------------------------------------------------------
 
-    def _determine_zoning(self, province: str, zoning_system: Dict, property_info: Dict) -> Dict:
-        """Choose the most likely zone and fill in all related fields."""
-        details = property_info.get("property_details", {})
-        acreage = details.get("acreage", 0) or 0
-        hints = [h.lower() for h in details.get("zoning_hints", [])]
-        intentions = [i.lower() for i in details.get("development_intentions", [])]
+    def _try_upgrade_with_provider(
+        self, policy_info: Dict, municipality_info: Dict, property_info: Dict
+    ) -> None:
+        """If a zoning provider exists for this municipality, query it and
+        merge the result into policy_info. Falls back silently to the
+        verification-required base on any failure (after recording the
+        failure in verification_status / verification_message)."""
+        muni_name = municipality_info.get("name", "")
+        provider = get_provider(muni_name)
+        if provider is None:
+            return  # No provider for this city — stay in Option A mode
 
-        # Determine category
-        if "industrial" in hints:
-            category = "industrial"
-        elif "commercial" in hints or "commercial" in intentions:
-            if acreage > 5:
-                category = "rural_commercial"
-            else:
-                category = "commercial"
-        elif acreage > 5 or "rural" in hints or "agricultural" in hints:
-            category = "rural"
-        elif acreage > 2:
-            category = "rural"
-        elif "residential" in hints or any(t in hints for t in ["apartment", "condo", "multifamily"]):
-            category = "residential_high"
-        else:
-            category = "residential_low"
-
-        # Pick province-appropriate zone code
-        zone_map = {
-            "residential_low": "residential",
-            "residential_high": "residential",
-            "commercial": "commercial",
-            "rural_commercial": "rural",
-            "industrial": "industrial",
-            "rural": "rural",
-        }
-
-        broad = zone_map.get(category, "residential")
-        zone_codes = list(zoning_system.get(broad, {}).items())
-
-        # Pick the first code that roughly matches the density level
-        if category == "residential_low" and len(zone_codes) >= 1:
-            code, label = zone_codes[0]
-        elif category == "residential_high" and len(zone_codes) >= 3:
-            code, label = zone_codes[2]
-        elif category == "rural_commercial" and "rural" in zoning_system:
-            rural_codes = list(zoning_system["rural"].items())
-            # Prefer anything with "commercial" or "RC" in the code/label
-            rc = next(
-                ((c, l) for c, l in rural_codes if "commercial" in l.lower() or "RC" in c),
-                rural_codes[-1] if rural_codes else ("RC", "Rural Commercial"),
+        coords = (property_info or {}).get("coordinates") or {}
+        lat = coords.get("latitude")
+        lon = coords.get("longitude")
+        if lat is None or lon is None:
+            policy_info["verification_status"] = "provider_failed"
+            policy_info["verification_message"] = (
+                f"{provider.municipality} zoning lookup is supported, but no "
+                "coordinates were available for this address. Geocoding may have failed."
             )
-            code, label = rc
-        elif zone_codes:
-            code, label = zone_codes[0]
-        else:
-            code, label = "R1", "Residential"
+            return
 
-        # Setback key
-        setback_key = category if category in SETBACK_TEMPLATES else "residential_low"
+        try:
+            result: Optional[ZoningResult] = provider.lookup(float(lat), float(lon))
+        except ProviderError as exc:
+            logger.warning("Zoning provider %s failed: %s", provider.name, exc)
+            policy_info["verification_status"] = "provider_failed"
+            policy_info["verification_message"] = (
+                f"{provider.municipality} zoning service is currently unavailable "
+                f"({exc}). Showing preliminary information only — verify with the "
+                "municipality before relying on this report."
+            )
+            return
+        except Exception as exc:  # noqa: BLE001 — defensive: never let a provider crash CanLand
+            logger.exception("Zoning provider %s raised unexpected exception", provider.name)
+            policy_info["verification_status"] = "provider_failed"
+            policy_info["verification_message"] = (
+                f"{provider.municipality} zoning lookup encountered an unexpected error: {exc}"
+            )
+            return
 
-        return {
-            "zoning": f"{code} — {label}",
-            "zoning_code": code,
-            "zone_category": category,
-            "permitted_uses": PERMITTED_USES.get(category, PERMITTED_USES["residential_low"]),
-            "discretionary_uses": DISCRETIONARY_USES.get(category, DISCRETIONARY_USES["residential_low"]),
-            "setbacks": SETBACK_TEMPLATES.get(setback_key, SETBACK_TEMPLATES["residential_low"]),
-            "density_restrictions": DENSITY_TEMPLATES.get(setback_key, DENSITY_TEMPLATES["residential_low"]),
-            "height_restrictions": HEIGHT_TEMPLATES.get(setback_key, HEIGHT_TEMPLATES["residential_low"]),
-        }
+        if result is None:
+            policy_info["verification_status"] = "outside_coverage"
+            policy_info["verification_message"] = (
+                f"The geocoded coordinates do not fall inside any {provider.municipality} "
+                "zoning polygon. The address may be outside the city, or the geocoder "
+                "may have returned the wrong location."
+            )
+            return
 
-    def _get_bylaw_info(self, municipality_info: Dict) -> Optional[Dict]:
+        # Success — upgrade to verified mode
+        policy_info["verification_required"] = False
+        policy_info["verification_status"] = "verified"
+        policy_info["verification_message"] = (
+            f"Zone retrieved from {result.source} on "
+            f"{result.retrieved_at}. Setbacks, height limits, density, and "
+            "permitted uses still must be read from the bylaw section linked below."
+        )
+        policy_info["zoning_status"] = (
+            f"Verified from {result.source}. "
+            "Specific setbacks, height limits, density, and use rules are not "
+            "included here — open the linked bylaw section for the authoritative text."
+        )
+        policy_info["zoning"] = f"{result.zone_code} — {result.zone_name}".strip(" —")
+        policy_info["zoning_code"] = result.zone_code
+        policy_info["zone_overlays"] = [o.to_dict() for o in result.overlays]
+        policy_info["zone_source"] = result.source
+        policy_info["zone_source_url"] = result.source_url
+        policy_info["zone_retrieved_at"] = result.retrieved_at
+        policy_info["zone_bylaw_section_url"] = result.bylaw_section_url
+        policy_info["zone_provider_notes"] = list(result.provider_notes)
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _cache_key(municipality_info: Dict, property_info: Dict) -> str:
+        """Stable cache key based on municipality + raw property input.
+
+        The previous implementation used `id(property_info)` which is reused
+        after garbage collection and could collide between unrelated requests.
+        """
+        muni_name = municipality_info.get("name", "")
+        province = municipality_info.get("province", "")
+        raw = property_info.get("raw_input", {}) if isinstance(property_info, dict) else {}
+        payload = json.dumps([muni_name, province, raw], sort_keys=True, default=str)
+        return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _get_bylaw_info(municipality_info: Dict) -> Optional[Dict]:
         url = municipality_info.get("land_use_bylaw")
         if not url:
             return None
         return {
             "url": url,
-            "title": f"{municipality_info.get('name', '')} Land Use Bylaw",
-            "sections": [
-                {"section": "1", "title": "Definitions and General Provisions", "description": "Definitions, purpose, and general requirements"},
-                {"section": "2", "title": "Zoning Districts", "description": "Description of all zoning districts and their intent"},
-                {"section": "3", "title": "General Regulations", "description": "Setbacks, height limits, parking, landscaping"},
-                {"section": "4", "title": "Development Permits", "description": "Application process and submission requirements"},
-                {"section": "5", "title": "Subdivision", "description": "Subdivision standards and approval process"},
-                {"section": "6", "title": "Variances and Appeals", "description": "Variance procedures and appeal rights"},
+            "title": f"{municipality_info.get('name', '')} Land Use Bylaw".strip(),
+        }
+
+    def get_cottage_development_analysis(self, policy_info: Dict, property_details: Dict) -> Dict:
+        """
+        Cottage / resort development analysis.
+
+        The previous implementation produced specific cottage-unit counts
+        (e.g. "developable acreage * 4.5 units/acre") based on a fabricated
+        zone category. Those numbers were not grounded in real zoning data
+        and have been removed. Until per-municipality zoning lookup is wired
+        in, this method returns a verification-required structure consistent
+        with the rest of the tool.
+        """
+        return {
+            "feasibility": "Verification Required",
+            "cottage_potential": {},
+            "regulatory_considerations": [
+                "Cottage / tourist accommodation feasibility depends on the specific zone designation, "
+                "which CanLand has not retrieved.",
+                "Most rural and agricultural zones in Canada do not permit cottage rentals as of right; "
+                "rezoning or a discretionary use approval may be required.",
+                "Servicing constraints (water, septic, fire access) typically drive feasibility more than "
+                "the zone code itself.",
+            ],
+            "next_steps": [
+                "Confirm the current zone designation with the municipal planning department.",
+                "Ask the municipality whether tourist accommodation / cottage rental is a permitted, "
+                "discretionary, or prohibited use in that zone.",
+                "Engage a qualified land use planner before incurring any further development costs.",
+                "Commission a Phase 1 environmental site assessment.",
+                "Obtain a servicing report (water supply, septic capacity, fire access).",
             ],
         }
 
-    def _get_dev_requirements(self, municipality_info: Dict, zone_category: str) -> List[str]:
-        province = municipality_info.get("province", "AB")
-        province_info_map = {
-            "BC": ("BC Building Code", "Local Government Act"),
-            "AB": ("Alberta Building Code", "Municipal Government Act"),
-            "SK": ("National Building Code", "Planning and Development Act"),
-            "MB": ("Manitoba Building Code", "The Planning Act"),
-            "ON": ("Ontario Building Code", "Planning Act"),
-            "QC": ("Code de construction du Québec", "Loi sur l'aménagement et l'urbanisme"),
-            "NB": ("National Building Code", "Community Planning Act"),
-            "NS": ("Nova Scotia Building Code", "Municipal Government Act"),
-            "PE": ("National Building Code", "Planning Act"),
-            "NL": ("National Building Code", "Urban and Rural Planning Act"),
-            "YT": ("National Building Code", "Municipal Act"),
-            "NT": ("National Building Code", "Cities, Towns and Villages Act"),
-            "NU": ("National Building Code", "Nunavut Planning Act"),
-        }
-        building_code, planning_act = province_info_map.get(province, ("National Building Code", "Municipal Planning Act"))
-
-        reqs = [
-            "Development permit required",
-            "Building permit required",
+    @staticmethod
+    def _get_dev_requirements(province: Optional[str], building_code: str, planning_act: str) -> List[str]:
+        # These apply to essentially any development in Canada and are safe to
+        # state without parcel-level data.
+        return [
+            "Development permit required for most new construction or change of use",
+            "Building permit required prior to construction",
             f"Compliance with {building_code}",
             f"Compliance with {planning_act}",
+            "Servicing connections (water, sewer, stormwater) must be confirmed with the municipality",
+            "Site-specific requirements (setbacks, height, density, parking) must be confirmed against the current land use bylaw",
         ]
-
-        if "commercial" in zone_category:
-            reqs += [
-                "Site plan approval required",
-                "Parking and circulation plan submission",
-                "Landscaping plan required",
-                "Signage permit required",
-                "Accessibility compliance (AODA/provincial equivalent)",
-            ]
-        if "rural" in zone_category:
-            reqs += [
-                "Septic / wastewater system approval (if applicable)",
-                "Water source testing required",
-                "Environmental site assessment may be required",
-                "Agricultural impact assessment",
-            ]
-        if "industrial" in zone_category:
-            reqs += [
-                "Environmental impact assessment required",
-                "Stormwater management plan",
-                "Traffic impact assessment",
-            ]
-
-        if "county" in municipality_info.get("type", "").lower():
-            reqs += [
-                "County road access approval",
-                "Fire protection plan",
-                "Waste management plan",
-            ]
-
-        return reqs
-
-    # ------------------------------------------------------------------
-    # Cottage / resort development analysis (preserved from original)
-    # ------------------------------------------------------------------
-
-    def get_cottage_development_analysis(self, policy_info: Dict, property_details: Dict) -> Dict:
-        analysis = {
-            "feasibility": "Unknown",
-            "cottage_potential": {},
-            "regulatory_considerations": [],
-            "next_steps": [],
-        }
-        zoning = policy_info.get("zoning", "")
-        zone_cat = policy_info.get("zone_category", "")
-        acreage = property_details.get("acreage", 0) or 0
-
-        if zone_cat == "rural_commercial" or "commercial" in zoning.lower():
-            analysis["feasibility"] = "High"
-            if acreage >= 5:
-                developable = acreage * 0.4
-                units = int(developable * 4.5)
-                analysis["cottage_potential"] = {
-                    "total_acreage": acreage,
-                    "developable_acreage": round(developable, 1),
-                    "estimated_cottage_units": units,
-                    "phased_development": True,
-                    "recommended_phase_1": min(5, units),
-                }
-            analysis["regulatory_considerations"] = [
-                "Tourist accommodation is typically a permitted or discretionary use",
-                "Development permit required for each phase",
-                "Site plan approval required",
-                "Septic system capacity assessment required",
-                "Water supply adequacy verification needed",
-                "Fire access and safety plan required",
-                "Environmental screening may be required",
-            ]
-        elif zone_cat == "rural" or "rural" in zoning.lower():
-            analysis["feasibility"] = "Moderate"
-            analysis["regulatory_considerations"] = [
-                "Rezoning to Rural Commercial may be required",
-                "Discretionary use application may be possible",
-                "Bed and breakfast operations typically permitted",
-                "Small-scale tourism may be conditionally approved",
-            ]
-        else:
-            analysis["feasibility"] = "Low"
-            analysis["regulatory_considerations"] = [
-                "Rezoning likely required",
-                "Commercial/tourist uses not typically permitted in this zone",
-                "Significant regulatory hurdles expected",
-                "Pre-application meeting strongly recommended",
-            ]
-
-        analysis["next_steps"] = [
-            "Schedule pre-application meeting with the planning department",
-            "Obtain detailed zoning map and bylaw review",
-            "Conduct Phase 1 environmental site assessment",
-            "Verify utility capacity and connection availability",
-            "Engage a development engineer for servicing analysis",
-            "Prepare a preliminary site plan",
-        ]
-        return analysis

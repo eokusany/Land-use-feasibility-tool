@@ -179,24 +179,54 @@ class ReportGenerator:
     def _create_executive_summary(self, data: Dict) -> List:
         """Create executive summary section"""
         story = []
-        
+
         story.append(Paragraph("Executive Summary", self.styles['CustomTitle']))
         story.append(Spacer(1, 0.3*inch))
-        
-        # Feasibility summary
-        feasibility_summary = data.get('feasibility_summary', {})
-        development_potential = feasibility_summary.get('development_potential', 'Unknown')
-        
-        # Create summary table
+
+        policy_info = data.get('policy_info', {}) or {}
+        is_verified = policy_info.get('verification_status') == 'verified'
+
+        # Banner — different copy for verified vs unverified
+        if is_verified:
+            zone_str = policy_info.get('zoning') or 'Unknown zone'
+            source = policy_info.get('zone_source') or 'the municipality'
+            banner = (
+                f"<b>ZONE VERIFIED.</b> The base zone for this parcel was retrieved from "
+                f"{source}: <b>{zone_str}</b>. Setbacks, height limits, density, and permitted "
+                "uses are not extracted by CanLand and must be read from the linked bylaw section. "
+                "Site-specific amendments and discretionary variances are not in the open dataset — "
+                "confirm with the municipal planning department before making development decisions."
+            )
+        else:
+            banner = (
+                "<b>VERIFICATION REQUIRED.</b> This report identifies the municipality and provides "
+                "general planning references only. CanLand does <b>not</b> retrieve parcel-level "
+                "zoning data for this municipality. The specific zone designation, permitted uses, "
+                "setbacks, height limits, and density restrictions for this property must be "
+                "confirmed directly with the municipal planning department before any development "
+                "decision is made."
+            )
+        story.append(Paragraph(banner, self.styles['Highlight']))
+        story.append(Spacer(1, 0.2*inch))
+
+        # Summary table — adapts to verified status
+        if is_verified:
+            zoning_row = policy_info.get('zoning') or 'Verified — see Zoning Reference section'
+            status_label = 'Zone Verified — Bylaw Review Required'
+        else:
+            zoning_row = 'Not retrieved — must be verified with municipality'
+            status_label = 'Preliminary — Verification Required'
+
         summary_data = [
             ['Assessment Category', 'Result'],
-            ['Development Potential', development_potential],
+            ['Status', status_label],
             ['Municipality', data.get('municipality_info', {}).get('name', 'Not Identified')],
-            ['Primary Zoning', data.get('policy_info', {}).get('zoning', 'Not Determined')],
+            ['Province / Territory', data.get('municipality_info', {}).get('province_name', 'Not specified')],
+            ['Parcel-Level Zoning', zoning_row],
             ['Report Date', datetime.now().strftime('%B %d, %Y')]
         ]
-        
-        summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
+
+        summary_table = Table(summary_data, colWidths=[2.5*inch, 3.5*inch])
         summary_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -205,32 +235,26 @@ class ReportGenerator:
             ('FONTSIZE', (0, 0), (-1, 0), 12),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
-        
+
         story.append(summary_table)
         story.append(Spacer(1, 0.3*inch))
-        
-        # Key findings
-        story.append(Paragraph("Key Findings", self.styles['SectionHeader']))
-        
-        key_considerations = feasibility_summary.get('key_considerations', [])
-        if key_considerations:
-            for consideration in key_considerations[:5]:  # Limit to top 5
-                story.append(Paragraph(f"• {consideration}", self.styles['Normal']))
-        else:
-            story.append(Paragraph("• Detailed analysis required to determine key considerations", self.styles['Normal']))
-        
+
+        # Key considerations from the (now honest) feasibility summary
+        feasibility_summary = data.get('feasibility_summary', {})
+        story.append(Paragraph("Key Considerations", self.styles['SectionHeader']))
+        for consideration in feasibility_summary.get('key_considerations', []):
+            story.append(Paragraph(f"• {consideration}", self.styles['Normal']))
+
         story.append(Spacer(1, 0.2*inch))
-        
-        # Recommended actions
+
+        # Top recommended actions
         story.append(Paragraph("Immediate Recommended Actions", self.styles['SectionHeader']))
-        
-        recommended_actions = feasibility_summary.get('recommended_actions', [])
-        if recommended_actions:
-            for i, action in enumerate(recommended_actions[:3], 1):  # Top 3 actions
-                story.append(Paragraph(f"{i}. {action}", self.styles['Normal']))
-        
+        for i, action in enumerate(feasibility_summary.get('recommended_actions', [])[:3], 1):
+            story.append(Paragraph(f"{i}. {action}", self.styles['Normal']))
+
         return story
     
     def _create_property_section(self, data: Dict) -> List:
@@ -247,9 +271,10 @@ class ReportGenerator:
         story.append(Paragraph("Property Details", self.styles['SectionHeader']))
         
         property_details = [
-            ['Address', raw_input.get('address', 'Not provided')],
-            ['Legal Description', raw_input.get('legal_description', 'Not provided')],
+            ['Address', raw_input.get('address', 'Not provided') or 'Not provided'],
         ]
+        if raw_input.get('legal_description'):
+            property_details.append(['Legal Description', raw_input['legal_description']])
         
         # Add coordinates if available
         coordinates = property_info.get('coordinates')
@@ -344,80 +369,145 @@ class ReportGenerator:
         return story
     
     def _create_policy_section(self, data: Dict) -> List:
-        """Create zoning and policy analysis section"""
+        """Create zoning and policy reference section.
+
+        We do not have parcel-level zoning, so this section now points the
+        user at the authoritative sources (bylaw URL, planning department)
+        and lists the verification steps and generic dev requirements.
+        """
         story = []
-        
-        story.append(Paragraph("Zoning and Policy Analysis", self.styles['Subtitle']))
+
+        story.append(Paragraph("Zoning and Policy Reference", self.styles['Subtitle']))
         story.append(Spacer(1, 0.2*inch))
-        
+
         policy_info = data.get('policy_info', {})
-        
+        municipality_info = data.get('municipality_info', {})
+
         if not policy_info:
             story.append(Paragraph("Policy information not available.", self.styles['Normal']))
             return story
-        
-        # Zoning information
-        zoning = policy_info.get('zoning')
-        if zoning:
-            story.append(Paragraph("Current Zoning", self.styles['SectionHeader']))
-            story.append(Paragraph(f"<b>Zoning Classification:</b> {zoning}", self.styles['Normal']))
+
+        is_verified = policy_info.get('verification_status') == 'verified'
+
+        if is_verified:
+            # --- Verified zone block ---
+            story.append(Paragraph("Parcel Zone (Verified)", self.styles['SectionHeader']))
+
+            zone_table_rows = [
+                ['Zone Code', policy_info.get('zoning_code') or '—'],
+                ['Zone Name', (policy_info.get('zoning') or '').split(' — ', 1)[-1] or '—'],
+                ['Source', policy_info.get('zone_source') or '—'],
+                ['Retrieved', policy_info.get('zone_retrieved_at') or '—'],
+            ]
+            zone_table = Table(zone_table_rows, colWidths=[1.6*inch, 4.4*inch])
+            zone_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(zone_table)
             story.append(Spacer(1, 0.1*inch))
-        
-        # Permitted uses
-        permitted_uses = policy_info.get('permitted_uses', [])
-        if permitted_uses:
-            story.append(Paragraph("Permitted Uses", self.styles['SectionHeader']))
-            for use in permitted_uses:
-                story.append(Paragraph(f"• {use}", self.styles['Normal']))
+
+            # Bylaw section deep link (per zone)
+            section_url = policy_info.get('zone_bylaw_section_url')
+            if section_url:
+                story.append(Paragraph(
+                    f'<b>Bylaw section for this zone:</b> '
+                    f'<a href="{section_url}" color="blue">{section_url}</a>',
+                    self.styles['Normal'],
+                ))
+                story.append(Paragraph(
+                    "<i>This is the authoritative source for setbacks, height limits, density, "
+                    "and permitted uses for this zone. CanLand does not parse bylaw text — "
+                    "read the linked section for the actual rules.</i>",
+                    self.styles['Normal'],
+                ))
+                story.append(Spacer(1, 0.1*inch))
+
+            # Provider notes (e.g. for DC1/DC2 site-specific zones)
+            for note in policy_info.get('zone_provider_notes') or []:
+                story.append(Paragraph(f"<b>Note:</b> {note}", self.styles['Highlight']))
+                story.append(Spacer(1, 0.05*inch))
+
+            # Overlays
+            overlays = policy_info.get('zone_overlays') or []
+            if overlays:
+                story.append(Paragraph("Overlay Zones in Effect", self.styles['SectionHeader']))
+                story.append(Paragraph(
+                    "<i>Overlay zones add or modify rules on top of the base zone above.</i>",
+                    self.styles['Normal'],
+                ))
+                for o in overlays:
+                    bylaw_no = f" (Bylaw {o['bylaw_no']})" if o.get('bylaw_no') else ""
+                    story.append(Paragraph(
+                        f"• <b>{o['code']}</b> — {o['description']}{bylaw_no}",
+                        self.styles['Normal'],
+                    ))
+                story.append(Spacer(1, 0.1*inch))
+
+            # Caveat — even verified zones still need municipal confirmation
+            story.append(Paragraph(
+                "<b>Important:</b> Site-specific amendments, previously granted variances, and "
+                "Direct Control conditions are not in the open dataset. Confirm the parcel-level "
+                "rules with the municipal planning department before making development decisions.",
+                self.styles['Highlight'],
+            ))
             story.append(Spacer(1, 0.1*inch))
-        
-        # Discretionary uses
-        discretionary_uses = policy_info.get('discretionary_uses', [])
-        if discretionary_uses:
-            story.append(Paragraph("Discretionary Uses", self.styles['SectionHeader']))
-            for use in discretionary_uses:
-                story.append(Paragraph(f"• {use}", self.styles['Normal']))
+
+        else:
+            # --- Unverified status callout (Option A copy) ---
+            story.append(Paragraph("Parcel-Level Zoning", self.styles['SectionHeader']))
+            zoning_status = policy_info.get(
+                'zoning_status',
+                'Not retrieved. Parcel-level zoning must be verified directly with the municipal planning department.'
+            )
+            story.append(Paragraph(f"<b>Status:</b> {zoning_status}", self.styles['Highlight']))
+
+            # Surface provider failure messages so the user knows what happened
+            verification_message = policy_info.get('verification_message')
+            if verification_message:
+                story.append(Paragraph(f"<i>{verification_message}</i>", self.styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
-        
-        # Development requirements
+
+        # Land use bylaw link (always shown when known)
+        bylaw = policy_info.get('land_use_bylaw') or {}
+        if bylaw.get('url'):
+            story.append(Paragraph("Land Use Bylaw", self.styles['SectionHeader']))
+            story.append(Paragraph(
+                f"<b>{bylaw.get('title', 'Land Use Bylaw')}:</b> "
+                f'<a href="{bylaw["url"]}" color="blue">{bylaw["url"]}</a>',
+                self.styles['Normal'],
+            ))
+            if not is_verified:
+                story.append(Paragraph(
+                    "Use the municipality's online zoning map (linked from the bylaw page above) "
+                    "to look up the current zone designation for this parcel.",
+                    self.styles['Normal'],
+                ))
+            story.append(Spacer(1, 0.1*inch))
+
+        # Verification steps
+        verification_steps = policy_info.get('verification_steps', [])
+        if verification_steps:
+            story.append(Paragraph("How to Verify Zoning for This Property", self.styles['SectionHeader']))
+            for i, step in enumerate(verification_steps, 1):
+                story.append(Paragraph(f"{i}. {step}", self.styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+
+        # Generic development requirements (province-aware, not parcel-specific)
         dev_requirements = policy_info.get('development_requirements', [])
         if dev_requirements:
-            story.append(Paragraph("Development Requirements", self.styles['SectionHeader']))
+            story.append(Paragraph("General Development Requirements", self.styles['SectionHeader']))
+            story.append(Paragraph(
+                "<i>The following apply to most development in this jurisdiction. "
+                "Site-specific requirements must still be confirmed with the municipality.</i>",
+                self.styles['Normal'],
+            ))
             for requirement in dev_requirements:
                 story.append(Paragraph(f"• {requirement}", self.styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
-        
-        # Setbacks and restrictions
-        setbacks = policy_info.get('setbacks', {})
-        density = policy_info.get('density_restrictions', {})
-        height = policy_info.get('height_restrictions', {})
-        
-        if setbacks or density or height:
-            story.append(Paragraph("Development Standards", self.styles['SectionHeader']))
-            
-            standards_data = [['Standard', 'Requirement']]
-            
-            for key, value in setbacks.items():
-                standards_data.append([f"{key.title()} Setback", value])
-            
-            for key, value in density.items():
-                standards_data.append([key.replace('_', ' ').title(), value])
-            
-            for key, value in height.items():
-                standards_data.append([key.replace('_', ' ').title(), value])
-            
-            if len(standards_data) > 1:
-                standards_table = Table(standards_data, colWidths=[3*inch, 3*inch])
-                standards_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                story.append(standards_table)
-        
+
         return story
     
     def _create_development_analysis(self, data: Dict) -> List:
@@ -525,15 +615,18 @@ class ReportGenerator:
         story.append(Paragraph("Appendix B: Analysis Methodology", self.styles['SectionHeader']))
         
         methodology_text = """
-        This feasibility study was generated by CanLand — Canadian Land Use Feasibility Platform, which
-        employs automated analysis of publicly available municipal and provincial data across all
-        13 Canadian provinces and territories. The analysis includes property identification,
-        municipality lookup via geocoding and name matching, province-aware zoning classification,
-        and policy interpretation based on each province's planning legislation.
+        This preliminary report was generated by CanLand — Canadian Land Use Feasibility Platform.
+        CanLand performs property identification (address parsing and geocoding), municipality
+        lookup against a database of Canadian municipalities, and provides links to the relevant
+        municipal land use bylaw and provincial planning legislation.
 
-        The tool provides preliminary assessments based on available data and should be supplemented
-        with professional planning consultation and direct verification with the relevant municipal
-        planning department before any development decisions are made.
+        <b>CanLand does NOT retrieve parcel-level zoning data.</b> The specific zone designation,
+        permitted uses, setbacks, height limits, density restrictions, and any site-specific
+        overlays for a given property are not determined by this tool and must be verified
+        directly with the municipal planning department before any development decision is made.
+
+        This report is intended as a starting point for due diligence — not as a substitute for
+        professional planning, engineering, or legal advice.
         """
         
         story.append(Paragraph(methodology_text, self.styles['Normal']))

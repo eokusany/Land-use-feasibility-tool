@@ -373,7 +373,7 @@
 <!-- ─── Hero ────────────────────────────────────────────────── -->
 <header class="cl-hero">
   <h1>Land Use Feasibility<br><span>Across All of Canada</span></h1>
-  <p>Enter any Canadian property address to instantly assess zoning, permitted uses, development standards, and generate a professional feasibility report.</p>
+  <p>Enter any Canadian property address to identify the municipality, locate the relevant land use bylaw, and generate a preliminary due-diligence report. Parcel-level zoning must be verified directly with the municipality.</p>
   <div class="province-pills" id="provincePills"></div>
 </header>
 
@@ -466,8 +466,8 @@
     <!-- ── STEP 2 — Loading ────────────────────────────────── -->
     <div id="panelStep2" class="loading-panel">
       <div class="spinner-border" role="status"></div>
-      <p>Analyzing property &amp; retrieving zoning data…</p>
-      <p class="text-muted" style="font-size:.83rem">Geocoding address · Matching municipality · Retrieving policies</p>
+      <p>Identifying municipality &amp; planning references…</p>
+      <p class="text-muted" style="font-size:.83rem">Geocoding address · Matching municipality · Looking up bylaw references</p>
     </div>
 
     <!-- ── STEP 3 — Results ───────────────────────────────── -->
@@ -486,65 +486,76 @@
 
       <div class="summary-grid" id="summaryGrid"></div>
 
+      <!-- Verification banner — populated by JS based on verification_status -->
+      <div id="resVerificationBanner" class="mt-3 p-3 rounded-3" style="font-size:.88rem"></div>
+
       <!-- Tabs -->
       <ul class="nav nav-tabs result-tabs mt-3" id="resultTabs">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabZoning">Zoning</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabUses">Permitted Uses</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabStandards">Standards</button></li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabZoning">Zoning Reference</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMuni">Municipality</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabActions">Next Steps</button></li>
       </ul>
       <div class="tab-content" id="resultTabContent">
 
-        <!-- Zoning tab -->
+        <!-- Zoning Reference tab -->
         <div class="tab-pane fade show active" id="tabZoning">
           <div class="row g-3">
-            <div class="col-md-6">
+            <!-- Verified zone block (shown only when verification_status === 'verified') -->
+            <div class="col-12" id="resVerifiedZoneBlock" style="display:none">
+              <div class="p-3 rounded-3" style="background:#e8f5e9; border:1px solid #66bb6a">
+                <div class="text-muted small fw-semibold mb-1">
+                  <i class="fas fa-circle-check me-1" style="color:#2e7d32"></i>VERIFIED PARCEL ZONE
+                </div>
+                <div class="fw-bold fs-5 text-navy" id="resVerifiedZoneCode">—</div>
+                <div class="text-muted small mt-1" id="resVerifiedZoneSource">—</div>
+                <div class="mt-2" id="resVerifiedBylawLink"></div>
+                <div class="mt-2 small" id="resVerifiedNotes" style="color:#444"></div>
+              </div>
+            </div>
+
+            <!-- Overlays (verified mode only) -->
+            <div class="col-12" id="resOverlaysBlock" style="display:none">
+              <div class="text-muted small fw-semibold mb-1">OVERLAY ZONES</div>
+              <p class="text-muted small mb-1"><em>Overlays add or modify rules on top of the base zone above.</em></p>
+              <ul class="use-list" id="resOverlaysList"></ul>
+            </div>
+
+            <!-- Unverified status block (shown only when not verified) -->
+            <div class="col-12" id="resUnverifiedBlock">
               <div class="p-3 rounded-3" style="background:var(--cl-light); border:1px solid var(--cl-border)">
-                <div class="text-muted small fw-semibold mb-1">ZONING CLASSIFICATION</div>
-                <div class="fw-bold fs-5 text-navy" id="resZoning">—</div>
+                <div class="text-muted small fw-semibold mb-1">PARCEL-LEVEL ZONING</div>
+                <div class="fw-bold fs-6 text-navy" id="resZoningStatus">
+                  Not retrieved — must be verified with the municipal planning department.
+                </div>
+                <div class="text-muted small mt-1" id="resVerificationMessage"></div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="p-3 rounded-3 h-100" style="background:var(--cl-light); border:1px solid var(--cl-border)">
+                <div class="text-muted small fw-semibold mb-1">PROVINCE PLANNING ACT</div>
+                <div class="fw-semibold" id="resPlanningAct" style="font-size:.93rem">—</div>
               </div>
             </div>
             <div class="col-md-6">
-              <div class="p-3 rounded-3" style="background:var(--cl-light); border:1px solid var(--cl-border)">
-                <div class="text-muted small fw-semibold mb-1">PROVINCE PLANNING ACT</div>
-                <div class="fw-semibold" id="resPlanningAct" style="font-size:.93rem">—</div>
+              <div class="p-3 rounded-3 h-100" style="background:var(--cl-light); border:1px solid var(--cl-border)">
+                <div class="text-muted small fw-semibold mb-1">BUILDING CODE</div>
+                <div class="fw-semibold" id="resBuildingCode" style="font-size:.93rem">—</div>
               </div>
             </div>
             <div class="col-12">
               <div class="text-muted small fw-semibold mb-1">LAND USE BYLAW REFERENCE</div>
               <div id="resBylawLink">—</div>
+              <p class="text-muted small mt-1 mb-0" id="resBylawHint">
+                Use the municipality's online zoning map (linked from the bylaw page) to look up the current zone for this parcel.
+              </p>
             </div>
             <div class="col-12">
-              <div class="text-muted small fw-semibold mb-1">DEVELOPMENT REQUIREMENTS</div>
+              <div class="text-muted small fw-semibold mb-1">GENERAL DEVELOPMENT REQUIREMENTS</div>
+              <p class="text-muted small mb-1"><em>Apply to most development in this jurisdiction. Site-specific requirements must still be confirmed.</em></p>
               <ul class="use-list" id="resDevReqs"></ul>
             </div>
           </div>
-        </div>
-
-        <!-- Uses tab -->
-        <div class="tab-pane fade" id="tabUses">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <h6 class="fw-bold mb-2"><i class="fas fa-circle-check text-success me-1"></i>Permitted Uses</h6>
-              <ul class="use-list" id="resPermitted"></ul>
-            </div>
-            <div class="col-md-6">
-              <h6 class="fw-bold mb-2"><i class="fas fa-circle-exclamation text-warning me-1"></i>Discretionary Uses</h6>
-              <ul class="use-list" id="resDiscretionary"></ul>
-              <p class="text-muted small mt-2 mb-0">Discretionary uses require an application and approval from the municipality.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Standards tab -->
-        <div class="tab-pane fade" id="tabStandards">
-          <table class="standards-table">
-            <thead>
-              <tr><th>Standard</th><th>Requirement</th></tr>
-            </thead>
-            <tbody id="resStandardsBody"></tbody>
-          </table>
         </div>
 
         <!-- Municipality tab -->
@@ -554,11 +565,11 @@
 
         <!-- Next steps tab -->
         <div class="tab-pane fade" id="tabActions">
-          <p class="text-muted small mb-2">Based on the zoning analysis, we recommend the following actions:</p>
+          <p class="text-muted small mb-2">Recommended verification and due-diligence steps:</p>
           <ol class="action-list" id="resActionsList"></ol>
           <div class="mt-3 p-3 rounded-3" style="background:#fffbe6; border:1px solid #ffe58f; font-size:.85rem">
-            <strong>Disclaimer:</strong> This analysis is preliminary and based on publicly available information.
-            Always verify with the municipal planning department before making development decisions.
+            <strong>Disclaimer:</strong> This is a preliminary reference report. CanLand does not retrieve parcel-level zoning.
+            Always verify with the municipal planning department before making any development decision.
           </div>
         </div>
 
@@ -579,14 +590,17 @@
       <div class="p-3 rounded-3 mb-3" style="background:var(--cl-light); border:1px solid var(--cl-border); font-size:.9rem">
         The report includes:
         <ul class="mt-2 mb-0" style="line-height:1.8">
-          <li>Executive Summary with feasibility rating</li>
-          <li>Property &amp; municipality details</li>
-          <li>Zoning classification and applicable bylaw</li>
-          <li>Permitted and discretionary uses</li>
-          <li>Development standards (setbacks, density, height)</li>
-          <li>Development requirements checklist</li>
-          <li>Recommended next steps</li>
+          <li>Executive summary with verification status</li>
+          <li>Property &amp; municipality identification</li>
+          <li>Land use bylaw link and zoning verification steps</li>
+          <li>Provincial planning act &amp; building code references</li>
+          <li>General development requirements checklist</li>
+          <li>Municipal planning department contact information</li>
+          <li>Recommended next steps for due diligence</li>
         </ul>
+        <p class="text-muted small mt-2 mb-0">
+          <em>Parcel-level zoning, permitted uses, setbacks, and density limits are not included — they must be verified directly with the municipality.</em>
+        </p>
       </div>
 
       <div id="reportLoading" style="display:none" class="text-center py-3">
@@ -628,8 +642,8 @@
              style="width:56px;height:56px;background:var(--cl-light)">
           <i class="fas fa-layer-group fa-lg" style="color:var(--cl-blue)"></i>
         </div>
-        <h6 class="fw-bold">3. Zoning Analysis</h6>
-        <p class="text-muted small">Retrieve zoning classification, permitted uses, setbacks, density limits, and bylaw references.</p>
+        <h6 class="fw-bold">3. Bylaw References</h6>
+        <p class="text-muted small">Locate the municipality's land use bylaw, planning department contact, and the verification steps you need to confirm zoning.</p>
       </div>
       <div class="col-md-3">
         <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-2"
@@ -818,76 +832,134 @@ function renderResults(data) {
   document.getElementById('resMuniProv').textContent =
     `${muni.province_name || ''} ${muni.province ? '('+muni.province+')' : ''}`;
 
-  // Feasibility badge
-  const pot  = feas.development_potential || 'Unknown';
+  const isVerified = policy.verification_status === 'verified';
+
+  // Status badge
   const badge = document.getElementById('resFeasBadge');
-  badge.className = 'feasibility-badge badge-' + pot.toLowerCase();
-  badge.innerHTML = `<i class="fas fa-circle-check"></i> ${pot} Potential`;
+  if (isVerified) {
+    badge.className = 'feasibility-badge badge-high';
+    badge.innerHTML = `<i class="fas fa-circle-check"></i> Zone Verified`;
+  } else {
+    badge.className = 'feasibility-badge badge-unknown';
+    badge.innerHTML = `<i class="fas fa-triangle-exclamation"></i> Verification Required`;
+  }
+
+  // Verification banner (top of result panel)
+  const bannerEl = document.getElementById('resVerificationBanner');
+  if (isVerified) {
+    bannerEl.style.background = '#e8f5e9';
+    bannerEl.style.border = '1px solid #66bb6a';
+    bannerEl.innerHTML = `
+      <strong><i class="fas fa-circle-check me-1" style="color:#2e7d32"></i>Zone verified.</strong>
+      The base zone for this parcel was retrieved from ${escapeHtml(policy.zone_source || 'the city open data')}.
+      Setbacks, height limits, density, and permitted uses are <strong>not</strong> extracted from bylaw text by CanLand —
+      open the linked bylaw section below for the authoritative rules. Site-specific amendments and discretionary
+      variances are not in the open dataset; confirm with the municipality before making development decisions.
+    `;
+  } else {
+    bannerEl.style.background = '#fff4e5';
+    bannerEl.style.border = '1px solid #ffb74d';
+    bannerEl.innerHTML = `
+      <strong><i class="fas fa-triangle-exclamation me-1" style="color:#e65100"></i>Verification required.</strong>
+      CanLand identifies the municipality and provides links to the land use bylaw and planning department.
+      It does <strong>not</strong> retrieve parcel-level zoning for this municipality. The specific zone, permitted uses,
+      setbacks, height, and density for this address must be confirmed directly with the municipality.
+    `;
+    if (policy.verification_message) {
+      bannerEl.innerHTML += `<div class="mt-1 small"><em>${escapeHtml(policy.verification_message)}</em></div>`;
+    }
+  }
 
   // Summary grid
-  const prop = data.property_info || {};
-  const raw  = prop.raw_input || {};
-  const det  = prop.property_details || {};
   const grid = document.getElementById('summaryGrid');
   grid.innerHTML = '';
   const cards = [
+    { label: 'Municipality', value: muni.name || '—' },
     { label: 'Province', value: muni.province_name || '—' },
-    { label: 'Zoning', value: policy.zoning_code || '—' },
     { label: 'Municipality Type', value: cap(muni.type) || '—' },
-    { label: 'Acreage', value: det.acreage ? det.acreage + ' acres' : '—' },
+    { label: 'Status', value: isVerified ? 'Zone Verified' : 'Verification Required' },
   ];
+  if (isVerified && policy.zoning_code) {
+    cards.push({ label: 'Zone Code', value: policy.zoning_code });
+  }
   if (muni.population) cards.push({ label: 'Population', value: muni.population.toLocaleString() });
-  if (muni.distance_km !== undefined) cards.push({ label: 'Distance Match', value: muni.distance_km + ' km' });
   cards.forEach(c => {
     const el = document.createElement('div');
     el.className = 'summary-card';
-    el.innerHTML = `<div class="sc-label">${c.label}</div><div class="sc-value">${c.value}</div>`;
+    el.innerHTML = `<div class="sc-label">${c.label}</div><div class="sc-value">${escapeHtml(c.value)}</div>`;
     grid.appendChild(el);
   });
 
-  // Zoning tab
-  document.getElementById('resZoning').textContent = policy.zoning || '—';
-  document.getElementById('resPlanningAct').textContent = muni.planning_act || '—';
+  // --- Zoning Reference tab ---
+  // Toggle verified vs unverified blocks
+  document.getElementById('resVerifiedZoneBlock').style.display = isVerified ? '' : 'none';
+  document.getElementById('resUnverifiedBlock').style.display = isVerified ? 'none' : '';
+  document.getElementById('resOverlaysBlock').style.display =
+    (isVerified && (policy.zone_overlays || []).length) ? '' : 'none';
 
+  if (isVerified) {
+    document.getElementById('resVerifiedZoneCode').textContent = policy.zoning || policy.zoning_code || '—';
+    const src = policy.zone_source || '';
+    const ts = policy.zone_retrieved_at || '';
+    document.getElementById('resVerifiedZoneSource').textContent =
+      `Source: ${src}${ts ? ' · Retrieved ' + ts : ''}`;
+
+    const sectionLink = document.getElementById('resVerifiedBylawLink');
+    if (policy.zone_bylaw_section_url) {
+      sectionLink.innerHTML = `
+        <a href="${policy.zone_bylaw_section_url}" target="_blank" class="text-primary fw-semibold small">
+          <i class="fas fa-external-link-alt me-1"></i>Read the bylaw section for this zone
+        </a>
+        <div class="text-muted small mt-1"><em>This is the authoritative source for setbacks, height limits, density, and permitted uses for this zone.</em></div>`;
+    } else {
+      sectionLink.innerHTML = '';
+    }
+
+    // Provider notes
+    const notesEl = document.getElementById('resVerifiedNotes');
+    notesEl.innerHTML = (policy.zone_provider_notes || [])
+      .map(n => `<div class="mt-1"><i class="fas fa-info-circle me-1" style="color:#1976d2"></i>${escapeHtml(n)}</div>`)
+      .join('');
+
+    // Overlays
+    const overlaysList = document.getElementById('resOverlaysList');
+    overlaysList.innerHTML = '';
+    (policy.zone_overlays || []).forEach(o => {
+      const li = document.createElement('li');
+      const bylawNo = o.bylaw_no ? ` <span class="text-muted">(Bylaw ${escapeHtml(o.bylaw_no)})</span>` : '';
+      li.innerHTML = `<i class="fas fa-layer-group use-icon"></i><strong>${escapeHtml(o.code)}</strong> — ${escapeHtml(o.description)}${bylawNo}`;
+      overlaysList.appendChild(li);
+    });
+  } else {
+    document.getElementById('resZoningStatus').textContent =
+      policy.zoning_status || 'Not retrieved — must be verified with the municipal planning department.';
+    document.getElementById('resVerificationMessage').textContent = policy.verification_message || '';
+  }
+
+  document.getElementById('resPlanningAct').textContent = muni.planning_act || '—';
+  document.getElementById('resBuildingCode').textContent =
+    muni.building_code || 'National Building Code of Canada';
+
+  // Land use bylaw link (general)
   const bylawDiv = document.getElementById('resBylawLink');
   const bylaw = policy.land_use_bylaw;
   if (bylaw && bylaw.url) {
     bylawDiv.innerHTML = `<a href="${bylaw.url}" target="_blank" class="text-primary small">
-      <i class="fas fa-external-link-alt me-1"></i>${bylaw.title || 'View Land Use Bylaw'}
+      <i class="fas fa-external-link-alt me-1"></i>${escapeHtml(bylaw.title || 'View Land Use Bylaw')}
     </a>`;
-  } else { bylawDiv.textContent = '—'; }
+  } else {
+    bylawDiv.innerHTML = '<span class="text-muted small">No bylaw URL on file for this municipality. Visit the municipality website (Municipality tab) to locate it.</span>';
+  }
+  // Hide the "use the city's zoning map" hint when we already have a verified zone
+  document.getElementById('resBylawHint').style.display = isVerified ? 'none' : '';
 
   const devReqs = document.getElementById('resDevReqs');
   devReqs.innerHTML = '';
   (policy.development_requirements || []).forEach(r => {
     const li = document.createElement('li');
-    li.innerHTML = `<i class="fas fa-check use-icon"></i>${r}`;
+    li.innerHTML = `<i class="fas fa-check use-icon"></i>${escapeHtml(r)}`;
     devReqs.appendChild(li);
   });
-
-  // Uses tab
-  renderUseList('resPermitted', policy.permitted_uses || [], 'use-icon fas fa-check');
-  renderUseList('resDiscretionary', policy.discretionary_uses || [], 'dis-icon fas fa-circle-exclamation');
-
-  // Standards tab
-  const body = document.getElementById('resStandardsBody');
-  body.innerHTML = '';
-  const setbacks  = policy.setbacks || {};
-  const density   = policy.density_restrictions || {};
-  const height    = policy.height_restrictions || {};
-  const allStds = [
-    ...Object.entries(setbacks).map(([k, v])  => [`${cap(k)} Setback`, v]),
-    ...Object.entries(density).map(([k, v])   => [formatKey(k), v]),
-    ...Object.entries(height).map(([k, v])    => [formatKey(k), v]),
-  ];
-  allStds.forEach(([k, v]) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="fw-semibold" style="color:#555">${k}</td><td>${v}</td>`;
-    body.appendChild(tr);
-  });
-  if (!allStds.length) {
-    body.innerHTML = '<tr><td colspan="2" class="text-muted">No standards data available.</td></tr>';
-  }
 
   // Municipality tab
   const ci = muni.contact_info || {};
@@ -917,13 +989,19 @@ function renderResults(data) {
     </div>` : ''}
   `;
 
-  // Actions tab
+  // Actions tab — verification steps + recommended actions, deduped
   const actionsList = document.getElementById('resActionsList');
   actionsList.innerHTML = '';
+  const seen = new Set();
   const allActions = [
+    ...(policy.verification_steps || []),
     ...(feas.recommended_actions || []),
-    ...(feas.key_considerations || []).map(c => `Review: ${c}`),
-  ];
+  ].filter(a => {
+    const k = a.trim().toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   allActions.forEach((a, i) => {
     const li = document.createElement('li');
     li.innerHTML = `<span class="action-num">${i+1}</span><span>${a}</span>`;
@@ -932,19 +1010,6 @@ function renderResults(data) {
 
   // Map
   showMap(data);
-}
-
-function renderUseList(id, items, iconClass) {
-  const el = document.getElementById(id);
-  el.innerHTML = '';
-  items.forEach(item => {
-    const li = document.createElement('li');
-    li.innerHTML = `<i class="${iconClass}"></i>${item}`;
-    el.appendChild(li);
-  });
-  if (!items.length) {
-    el.innerHTML = '<li>—</li>';
-  }
 }
 
 // ── Map ───────────────────────────────────────────────────────
@@ -1043,8 +1108,14 @@ function cap(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
-function formatKey(key) {
-  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 </script>
 </body>

@@ -63,3 +63,6 @@ instance/
 # Temporary files
 *.tmp
 *.temp
+
+# MCP config (contains env var refs — keep local)
+.mcp.json

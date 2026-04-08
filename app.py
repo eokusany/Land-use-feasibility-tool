@@ -97,55 +97,77 @@ def get_municipalities():
 
 
 def _generate_feasibility_summary(policy_info: dict) -> dict:
-    summary = {
-        "development_potential": "Unknown",
-        "key_considerations": [],
-        "recommended_actions": [],
-    }
+    """
+    Build a summary that reflects what we actually know.
 
-    zone_cat = policy_info.get("zone_category", "")
-    zoning = policy_info.get("zoning", "") or ""
+    Two modes:
+      - verified:   a zoning provider returned a real zone code from the
+                    city's open-data API. We name the zone but still don't
+                    fabricate setbacks/height/uses — those live in bylaw text.
+      - unverified: no provider available, geocoding failed, or provider
+                    errored. Same Option-A behaviour as before.
+    """
+    province = policy_info.get("province") or ""
+    bylaw = policy_info.get("land_use_bylaw") or {}
+    bylaw_url = bylaw.get("url")
+    status = policy_info.get("verification_status", "unverified")
 
-    if zone_cat in ("residential_low", "residential_high", "commercial", "rural_commercial"):
-        summary["development_potential"] = "High"
-    elif zone_cat in ("rural",):
-        summary["development_potential"] = "Moderate"
-    elif zone_cat == "industrial":
-        summary["development_potential"] = "Moderate"
-    else:
-        # Fallback — check text
-        if any(t in zoning.lower() for t in ["residential", "commercial", "mixed"]):
-            summary["development_potential"] = "High"
-        elif any(t in zoning.lower() for t in ["agricultural", "rural"]):
-            summary["development_potential"] = "Moderate"
-        else:
-            summary["development_potential"] = "Low"
+    if status == "verified":
+        zone = policy_info.get("zoning") or "Unknown"
+        source = policy_info.get("zone_source") or "the city's open data"
+        section_url = policy_info.get("zone_bylaw_section_url")
+        overlays = policy_info.get("zone_overlays") or []
 
-    setbacks = policy_info.get("setbacks", {})
-    if setbacks:
-        summary["key_considerations"].append(
-            f"Setback requirements — front: {setbacks.get('front', 'N/A')}, "
-            f"rear: {setbacks.get('rear', 'N/A')}, side: {setbacks.get('side', 'N/A')}"
-        )
+        key_considerations = [
+            f"Parcel zone: {zone} (verified from {source}).",
+            "CanLand does not extract setbacks, height limits, density, or permitted uses from bylaw text. "
+            "Open the linked bylaw section for the authoritative rules.",
+        ]
+        if overlays:
+            overlay_str = ", ".join(f"{o['code']} ({o['description']})" for o in overlays)
+            key_considerations.append(f"Overlays in effect: {overlay_str}")
+        for note in policy_info.get("zone_provider_notes") or []:
+            key_considerations.append(note)
 
-    density = policy_info.get("density_restrictions", {})
-    if density.get("maximum_site_coverage"):
-        summary["key_considerations"].append(
-            f"Maximum site coverage: {density['maximum_site_coverage']}"
-        )
+        recommended_actions = []
+        if section_url:
+            recommended_actions.append(f"Read the bylaw section that governs this zone: {section_url}")
+        recommended_actions += [
+            "Confirm any site-specific amendments or discretionary variances with the municipality",
+            "Contact the municipal planning department for site-specific guidance",
+            f"Confirm compliance with {province} provincial planning legislation" if province else "Confirm compliance with provincial planning legislation",
+            "Engage a qualified land use planner before making development decisions",
+        ]
 
-    if policy_info.get("special_provisions"):
-        summary["key_considerations"].extend(policy_info["special_provisions"])
+        return {
+            "development_potential": "Zone Verified — Bylaw Review Required",
+            "key_considerations": key_considerations,
+            "recommended_actions": recommended_actions,
+        }
 
-    summary["recommended_actions"] = [
-        "Consult with the municipal planning department",
-        "Review the detailed land use bylaw for this zone",
-        f"Confirm compliance with {policy_info.get('province', '')} provincial planning legislation",
-        "Commission an environmental assessment if required",
-        "Verify utility availability and service capacity",
+    # --- Unverified path (Option A behaviour) ---
+    key_considerations = [
+        "Parcel-level zoning has NOT been retrieved by this tool — it must be confirmed with the municipal planning department.",
+        "Setbacks, height limits, density, and permitted uses depend on the specific zone designation and cannot be assumed from the address alone.",
+    ]
+    if policy_info.get("verification_message"):
+        key_considerations.insert(0, policy_info["verification_message"])
+    if bylaw_url:
+        key_considerations.append(f"Reference the current land use bylaw: {bylaw_url}")
+
+    recommended_actions = [
+        "Look up the parcel on the municipality's online zoning map",
+        "Contact the municipal planning department to confirm the current zone designation",
+        "Request a Letter of Compliance or Zoning Memo for the legal title",
+        f"Confirm compliance with {province} provincial planning legislation" if province else "Confirm compliance with provincial planning legislation",
+        "Engage a qualified land use planner before making development decisions",
     ]
 
-    return summary
+    return {
+        "development_potential": "Verification Required",
+        "key_considerations": key_considerations,
+        "recommended_actions": recommended_actions,
+    }
 
 
 if __name__ == "__main__":
