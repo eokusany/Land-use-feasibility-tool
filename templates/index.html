@@ -3,7 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CanLand — Canadian Land Use Feasibility Platform</title>
+  <title>Plotline — Canadian zoning lookup &amp; feasibility</title>
+  <meta name="description" content="Plotline identifies the municipality and land use bylaw for any Canadian address. Verified parcel-level zoning for Edmonton and Calgary; bylaw lookup for 90+ other cities." />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Plotline — Canadian zoning lookup" />
+  <meta property="og:description" content="Verify parcel-level zoning for Edmonton &amp; Calgary, identify the bylaw for 90+ other Canadian cities." />
+  <meta property="og:type" content="website" />
+
+  <!-- Inter for a more modern feel; Bootstrap font fallback handles the rest -->
+  <link rel="preconnect" href="https://rsms.me/" />
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
 
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -14,80 +24,218 @@
 
   <style>
     :root {
-      --cl-red:   #d52b1e;   /* Canada red */
-      --cl-navy:  #1a2744;
-      --cl-blue:  #2c5aa0;
-      --cl-light: #f4f6fb;
-      --cl-muted: #6c757d;
-      --cl-border:#dee2e6;
-      --radius:   12px;
-      --shadow:   0 4px 24px rgba(0,0,0,.09);
+      --pl-ink:    #0f172a;   /* primary text */
+      --pl-navy:   #1e2a4a;   /* deep brand navy */
+      --pl-blue:   #2c5aa0;   /* accent / primary action */
+      --pl-blue-2: #1a3d7e;
+      --pl-mint:   #0f5c36;   /* verified state */
+      --pl-amber:  #b45309;   /* needs-verification state */
+      --pl-light:  #f6f7fb;
+      --pl-soft:   #eef1f7;
+      --pl-muted:  #5e6a82;
+      --pl-border: #e2e6ee;
+      --pl-radius: 14px;
+      --pl-shadow: 0 8px 32px rgba(15,23,42,.08);
+      --pl-shadow-sm: 0 2px 8px rgba(15,23,42,.06);
+
+      /* Legacy aliases kept for any inline styles or JS hooks */
+      --cl-red:    #d52b1e;
+      --cl-navy:   var(--pl-navy);
+      --cl-blue:   var(--pl-blue);
+      --cl-light:  var(--pl-light);
+      --cl-muted:  var(--pl-muted);
+      --cl-border: var(--pl-border);
+      --radius:    var(--pl-radius);
+      --shadow:    var(--pl-shadow);
     }
 
     *, *::before, *::after { box-sizing: border-box; }
 
     body {
-      background: var(--cl-light);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      color: #212529;
+      background: var(--pl-light);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      color: var(--pl-ink);
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    @supports (font-variation-settings: normal) {
+      body { font-family: 'Inter var', 'Inter', system-ui, sans-serif; }
     }
 
     /* ── Navbar ─────────────────────────────────────────────── */
     .cl-nav {
-      background: var(--cl-navy);
-      padding: .75rem 1.5rem;
+      background: rgba(30, 42, 74, .96);
+      backdrop-filter: saturate(140%) blur(10px);
+      -webkit-backdrop-filter: saturate(140%) blur(10px);
+      padding: .7rem 1.5rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,.3);
+      box-shadow: 0 1px 0 rgba(255,255,255,.04), 0 4px 16px rgba(0,0,0,.18);
     }
     .cl-nav .brand {
       display: flex;
       align-items: center;
-      gap: .6rem;
+      gap: .55rem;
       color: #fff;
       text-decoration: none;
     }
-    .cl-nav .brand .maple { color: var(--cl-red); font-size: 1.4rem; }
-    .cl-nav .brand span { font-size: 1.25rem; font-weight: 700; letter-spacing: -.5px; }
-    .cl-nav .brand small { font-size: .7rem; color: rgba(255,255,255,.55); display: block; line-height: 1; }
+    .cl-nav .brand .mark {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #4f8fe3 0%, #2c5aa0 100%);
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #fff; font-size: .85rem;
+      box-shadow: 0 2px 8px rgba(44,90,160,.4);
+    }
+    .cl-nav .brand .wordmark { font-size: 1.18rem; font-weight: 700; letter-spacing: -.3px; }
     .cl-nav-links a {
-      color: rgba(255,255,255,.75);
+      color: rgba(255,255,255,.72);
       text-decoration: none;
       font-size: .88rem;
       margin-left: 1.25rem;
-      transition: color .2s;
+      transition: color .15s;
     }
     .cl-nav-links a:hover { color: #fff; }
+    .cl-nav-links .nav-cta {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 8px;
+      padding: .35rem .85rem;
+      color: #fff;
+    }
+    .cl-nav-links .nav-cta:hover { background: rgba(255,255,255,.16); }
 
     /* ── Hero ────────────────────────────────────────────────── */
     .cl-hero {
-      background: linear-gradient(135deg, var(--cl-navy) 0%, #253a6b 100%);
+      background:
+        radial-gradient(1100px 500px at -10% -50%, rgba(76,134,222,.32), transparent 60%),
+        radial-gradient(900px 400px at 110% 110%, rgba(213,43,30,.18), transparent 55%),
+        linear-gradient(160deg, #1a2744 0%, #253a6b 100%);
       color: #fff;
-      padding: 3.5rem 1.5rem 4rem;
-      text-align: center;
+      padding: 2.25rem 1.5rem 5.5rem;  /* extra bottom padding so the wizard card tucks under */
     }
-    .cl-hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; margin-bottom: .5rem; }
-    .cl-hero h1 span { color: var(--cl-red); }
-    .cl-hero p { font-size: 1.05rem; color: rgba(255,255,255,.75); max-width: 580px; margin: 0 auto 2rem; }
-
-    /* Province pills */
-    .province-pills { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin-top: 1rem; }
-    .province-pills .pill {
-      background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.2);
+    .cl-hero-grid {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    .cl-hero-eyebrow {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.18);
       border-radius: 999px;
-      color: rgba(255,255,255,.8);
-      font-size: .75rem;
-      padding: .25rem .75rem;
+      padding: .25rem .7rem;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .35px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.9);
+    }
+    .cl-hero-eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.25); }
+    .cl-hero h1 {
+      font-size: clamp(1.65rem, 3.4vw, 2.5rem);
+      font-weight: 800;
+      letter-spacing: -.6px;
+      margin: .85rem 0 .6rem;
+      line-height: 1.1;
+    }
+    .cl-hero h1 .accent { background: linear-gradient(90deg, #ffbf7a 0%, #ff8a65 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .cl-hero p { font-size: 1rem; color: rgba(255,255,255,.78); max-width: 540px; margin: 0 0 1.25rem; line-height: 1.55; }
+
+    /* Stat strip — what the tool actually covers */
+    .cl-stats {
+      display: flex; gap: 1.6rem;
+      margin: 1.25rem 0 .25rem;
+      flex-wrap: wrap;
+    }
+    .cl-stats .stat .num { font-size: 1.35rem; font-weight: 700; color: #fff; line-height: 1; }
+    .cl-stats .stat .lbl { font-size: .72rem; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .4px; margin-top: .25rem; }
+
+    /* Verified-cities chip — the differentiator */
+    .verified-chip {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: rgba(74,222,128,.12);
+      border: 1px solid rgba(74,222,128,.3);
+      color: #a7f3d0;
+      border-radius: 999px;
+      padding: .3rem .8rem;
+      font-size: .78rem;
+      font-weight: 600;
+    }
+
+    /* Right-column "see what you get" card */
+    .hero-preview {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: var(--pl-radius);
+      padding: 1.1rem 1.25rem;
+      color: #fff;
+      box-shadow: 0 12px 40px rgba(0,0,0,.25);
+      backdrop-filter: blur(6px);
+    }
+    .hero-preview .hp-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: rgba(255,255,255,.55); margin-bottom: .35rem; }
+    .hero-preview .hp-zone { font-size: 1.4rem; font-weight: 700; }
+    .hero-preview .hp-name { color: rgba(255,255,255,.75); font-size: .9rem; margin-bottom: .85rem; }
+    .hero-preview .hp-row { display: flex; gap: .5rem; align-items: center; font-size: .8rem; color: rgba(255,255,255,.75); margin-top: .35rem; }
+    .hero-preview .hp-row i { color: #a7f3d0; }
+    .hero-preview .hp-source { font-size: .72rem; color: rgba(255,255,255,.45); margin-top: .65rem; }
+    .hero-preview .hp-try {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: #fff;
+      color: var(--pl-navy);
+      border: none;
+      border-radius: 8px;
+      padding: .5rem .9rem;
+      font-size: .82rem;
+      font-weight: 600;
+      margin-top: 1rem;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .hero-preview .hp-try:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+
+    /* Province pills — now interactive */
+    .province-pills { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: 1rem; }
+    .province-pills .pill {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 999px;
+      color: rgba(255,255,255,.82);
+      font-size: .72rem;
+      padding: .22rem .7rem;
+      cursor: pointer;
+      transition: background .15s, transform .1s, border-color .15s;
+    }
+    .province-pills .pill:hover { background: rgba(255,255,255,.18); transform: translateY(-1px); }
+    .province-pills .pill.verified {
+      border-color: rgba(74,222,128,.45);
+      color: #d1fae5;
+    }
+    .province-pills .pill.verified::before {
+      content: '●';
+      color: #4ade80;
+      margin-right: .25rem;
+      font-size: .55rem;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 768px) {
+      .cl-hero { padding: 1.75rem 1rem 4.5rem; }
+      .cl-hero-grid { grid-template-columns: 1fr; gap: 1rem; }
+      .hero-preview { order: -1; }  /* show the proof first on mobile */
+      .cl-stats { gap: 1.1rem; }
     }
 
     /* ── Step wizard ─────────────────────────────────────────── */
-    .wizard-wrapper { max-width: 900px; margin: -2.5rem auto 3rem; padding: 0 1rem; }
+    .wizard-wrapper { max-width: 980px; margin: -3.5rem auto 3rem; padding: 0 1rem; position: relative; z-index: 2; }
 
     .wizard-stepper {
       display: flex;
@@ -95,6 +243,9 @@
       border-radius: var(--radius) var(--radius) 0 0;
       border-bottom: 2px solid var(--cl-border);
       overflow: hidden;
+      list-style: none;
+      padding: 0;
+      margin: 0;
     }
     .step-btn {
       flex: 1;
@@ -112,6 +263,7 @@
       gap: .2rem;
       position: relative;
       transition: color .2s;
+      list-style: none;
     }
     .step-btn .step-num {
       width: 26px; height: 26px;
@@ -334,6 +486,38 @@
       color: #7a1a1a;
       margin-top: 1rem;
     }
+    .cl-alert:focus { outline: 2px solid var(--cl-red); outline-offset: 2px; }
+
+    /* Skip-to-content link for keyboard users */
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: auto;
+      width: 1px; height: 1px;
+      overflow: hidden;
+    }
+    .skip-link:focus {
+      left: 1rem;
+      top: 1rem;
+      width: auto; height: auto;
+      background: #fff;
+      color: var(--cl-navy);
+      padding: .5rem 1rem;
+      z-index: 9999;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+
+    /* Better focus rings for keyboard users */
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--cl-blue);
+      outline-offset: 2px;
+    }
+
+    /* Reduce motion when the user prefers it */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
 
     /* ── Footer ──────────────────────────────────────────────── */
     .cl-footer {
@@ -355,57 +539,115 @@
 </head>
 <body>
 
+<a href="#mainContent" class="skip-link">Skip to main content</a>
+
+<noscript>
+  <div style="background:#fde8e8;border-left:4px solid #d52b1e;padding:1rem 1.25rem;margin:1rem;border-radius:8px;color:#7a1a1a">
+    <strong>JavaScript is required.</strong> CanLand uses JavaScript to query the
+    municipal lookup APIs and render results. Please enable JavaScript in your
+    browser to use this tool.
+  </div>
+</noscript>
+
 <!-- ─── Navbar ──────────────────────────────────────────────── -->
-<nav class="cl-nav">
+<nav class="cl-nav" aria-label="Primary">
   <a href="/" class="brand">
-    <i class="fas fa-leaf maple"></i>
-    <div>
-      <span>CanLand</span>
-      <small>Canadian Land Use Feasibility</small>
-    </div>
+    <span class="mark" aria-hidden="true"><i class="fas fa-draw-polygon"></i></span>
+    <span class="wordmark">Plotline</span>
   </a>
-  <div class="cl-nav-links d-none d-md-flex">
-    <a href="#how-it-works"><i class="fas fa-info-circle me-1"></i>How it works</a>
-    <a href="https://github.com" target="_blank"><i class="fab fa-github me-1"></i>GitHub</a>
+  <div class="cl-nav-links d-none d-md-flex align-items-center">
+    <a href="#how-it-works"><i class="fas fa-circle-info me-1" aria-hidden="true"></i>How it works</a>
+    <a href="#coverage"><i class="fas fa-map-location-dot me-1" aria-hidden="true"></i>Coverage</a>
+    <a class="nav-cta" href="https://github.com/eokusany/Land-use-feasibility-tool" target="_blank" rel="noopener noreferrer">
+      <i class="fab fa-github me-1" aria-hidden="true"></i>GitHub
+    </a>
   </div>
 </nav>
 
 <!-- ─── Hero ────────────────────────────────────────────────── -->
 <header class="cl-hero">
-  <h1>Land Use Feasibility<br><span>Across All of Canada</span></h1>
-  <p>Enter any Canadian property address to identify the municipality, locate the relevant land use bylaw, and generate a preliminary due-diligence report. Parcel-level zoning must be verified directly with the municipality.</p>
-  <div class="province-pills" id="provincePills"></div>
+  <div class="cl-hero-grid">
+    <div>
+      <span class="cl-hero-eyebrow">
+        <span class="dot" aria-hidden="true"></span> Canadian zoning &amp; bylaw lookup
+      </span>
+      <h1>The honest answer to <span class="accent">"what's this zoned?"</span></h1>
+      <p>
+        Enter any Canadian address. Plotline identifies the municipality, links
+        the land use bylaw, and — for supported cities — returns the verified
+        parcel-level zone code straight from the city's open data.
+        Anywhere we can't verify, we tell you to call the planning department.
+        No fabricated answers.
+      </p>
+
+      <div class="cl-stats" aria-label="Coverage">
+        <div class="stat"><div class="num"><span id="muniCount">92</span></div><div class="lbl">municipalities</div></div>
+        <div class="stat"><div class="num">2</div><div class="lbl">verified live</div></div>
+        <div class="stat"><div class="num">13</div><div class="lbl">provinces &amp; territories</div></div>
+      </div>
+
+      <div style="margin-top:1rem">
+        <span class="verified-chip">
+          <i class="fas fa-circle-check" aria-hidden="true"></i>
+          Verified zoning: Edmonton &amp; Calgary
+        </span>
+      </div>
+
+      <div class="province-pills" id="provincePills" role="list" aria-label="Provinces and territories"></div>
+    </div>
+
+    <aside class="hero-preview" aria-label="Sample verified result">
+      <div class="hp-title">Verified parcel zone · sample</div>
+      <div class="hp-zone">CCA</div>
+      <div class="hp-name">Core Commercial Arts Zone · Edmonton, AB</div>
+      <div class="hp-row"><i class="fas fa-circle-check" aria-hidden="true"></i> Retrieved from Edmonton Open Data</div>
+      <div class="hp-row"><i class="fas fa-layer-group" aria-hidden="true"></i> Overlays: Downtown Special Area, EDC</div>
+      <div class="hp-row"><i class="fas fa-book" aria-hidden="true"></i> Linked to bylaw section 327</div>
+      <div class="hp-source">Source: Zoning Bylaw 20001 · live API</div>
+      <button type="button" class="hp-try" id="tryDemoBtn">
+        <i class="fas fa-bolt" aria-hidden="true"></i> Try this address
+      </button>
+    </aside>
+  </div>
 </header>
 
 <!-- ─── Wizard ──────────────────────────────────────────────── -->
-<div class="wizard-wrapper">
+<main id="mainContent" class="wizard-wrapper" role="main">
 
   <!-- Stepper -->
-  <div class="wizard-stepper">
-    <button class="step-btn active" id="step1Btn">
-      <span class="step-num">1</span>
+  <ol class="wizard-stepper" aria-label="Workflow progress" role="list">
+    <li class="step-btn active" id="step1Btn" aria-current="step">
+      <span class="step-num" aria-hidden="true">1</span>
       <span class="d-sm-inline">Property</span>
-    </button>
-    <button class="step-btn" id="step2Btn">
-      <span class="step-num">2</span>
+    </li>
+    <li class="step-btn" id="step2Btn">
+      <span class="step-num" aria-hidden="true">2</span>
       <span class="d-sm-inline">Analysis</span>
-    </button>
-    <button class="step-btn" id="step3Btn">
-      <span class="step-num">3</span>
+    </li>
+    <li class="step-btn" id="step3Btn">
+      <span class="step-num" aria-hidden="true">3</span>
       <span class="d-sm-inline">Results</span>
-    </button>
-    <button class="step-btn" id="step4Btn">
-      <span class="step-num">4</span>
+    </li>
+    <li class="step-btn" id="step4Btn">
+      <span class="step-num" aria-hidden="true">4</span>
       <span class="d-sm-inline">Report</span>
-    </button>
-  </div>
+    </li>
+  </ol>
 
   <div class="cl-card">
 
     <!-- ── STEP 1 — Input form ─────────────────────────────── -->
     <div id="panelStep1">
-      <h5 class="fw-bold mb-1">Enter Property Details</h5>
-      <p class="text-muted small mb-3">Select a province and city, then provide an address or description of the property.</p>
+      <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+        <div>
+          <h5 class="fw-bold mb-1" tabindex="-1">Enter property details</h5>
+          <p class="text-muted small mb-0">Province + city, then any address, legal description, or notes you have.</p>
+        </div>
+        <button type="button" class="btn btn-sm" id="tryDemoBtnInline"
+                style="background:var(--pl-soft);border:1px solid var(--pl-border);font-size:.78rem;color:var(--pl-blue);font-weight:600">
+          <i class="fas fa-bolt me-1" aria-hidden="true"></i>Try a sample
+        </button>
+      </div>
 
       <form id="propertyForm">
         <div class="row g-3">
@@ -449,12 +691,15 @@
 
         </div><!-- /row -->
 
-        <div id="cl-error" class="cl-alert"></div>
+        <div id="cl-error" class="cl-alert" tabindex="-1" aria-live="assertive"></div>
 
         <div class="d-flex align-items-center justify-content-between mt-3">
-          <span class="text-muted small"><i class="fas fa-database me-1"></i><span id="muniCount">…</span> municipalities across Canada</span>
+          <span class="text-muted small">
+            <i class="fas fa-shield-halved me-1" aria-hidden="true" style="color:var(--pl-mint)"></i>
+            Verified zoning for Edmonton &amp; Calgary · bylaw lookup elsewhere
+          </span>
           <button type="submit" class="btn btn-canland" id="analyzeBtn">
-            <i class="fas fa-search me-2"></i>Analyze Property
+            <i class="fas fa-magnifying-glass-location me-2" aria-hidden="true"></i>Analyze Property
           </button>
         </div>
       </form>
@@ -464,8 +709,10 @@
     </div>
 
     <!-- ── STEP 2 — Loading ────────────────────────────────── -->
-    <div id="panelStep2" class="loading-panel">
-      <div class="spinner-border" role="status"></div>
+    <div id="panelStep2" class="loading-panel" aria-live="polite" aria-busy="true">
+      <div class="spinner-border" role="status">
+        <span class="visually-hidden">Analysing property…</span>
+      </div>
       <p>Identifying municipality &amp; planning references…</p>
       <p class="text-muted" style="font-size:.83rem">Geocoding address · Matching municipality · Looking up bylaw references</p>
     </div>
@@ -614,12 +861,54 @@
     </div>
 
   </div><!-- /cl-card -->
-</div><!-- /wizard-wrapper -->
+</main><!-- /wizard-wrapper -->
+
+<!-- ─── Coverage section (the verified-vs-bylaw-only honest disclosure) ── -->
+<section id="coverage" style="background:#fff; padding:2.5rem 1rem; border-top:1px solid var(--pl-border)">
+  <div class="container" style="max-width:860px">
+    <h4 class="text-center fw-bold mb-2">Where Plotline can verify zoning today</h4>
+    <p class="text-center text-muted small mb-4" style="max-width:600px;margin:0 auto 1.5rem">
+      We only show verified zoning when we can query the city's own open data.
+      Everywhere else, we tell you exactly what to verify and where.
+    </p>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="p-3 rounded-3" style="border:1px solid #66bb6a; background:#e8f5e9; height:100%">
+          <div class="d-flex align-items-start gap-2">
+            <i class="fas fa-circle-check fs-4" style="color:#2e7d32" aria-hidden="true"></i>
+            <div>
+              <div class="fw-bold">Verified — Edmonton &amp; Calgary</div>
+              <div class="small text-muted">
+                Parcel-level zone code, overlays, and a deep link to the bylaw section,
+                pulled live from each city's open-data API.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="p-3 rounded-3" style="border:1px solid #ffb74d; background:#fff4e5; height:100%">
+          <div class="d-flex align-items-start gap-2">
+            <i class="fas fa-triangle-exclamation fs-4" style="color:#e65100" aria-hidden="true"></i>
+            <div>
+              <div class="fw-bold">Bylaw lookup — 90 other cities</div>
+              <div class="small text-muted">
+                We identify the municipality, link the current bylaw and planning
+                department, and list the verification steps you need to take.
+                We <strong>do not</strong> guess the zone.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ─── How It Works ─────────────────────────────────────────── -->
-<section id="how-it-works" style="background:#fff; padding:3rem 1rem; border-top:1px solid var(--cl-border)">
+<section id="how-it-works" style="background:var(--pl-soft); padding:3rem 1rem; border-top:1px solid var(--pl-border)">
   <div class="container" style="max-width:860px">
-    <h4 class="text-center fw-bold mb-4">How CanLand Works</h4>
+    <h4 class="text-center fw-bold mb-4">How Plotline works</h4>
     <div class="row g-4 text-center">
       <div class="col-md-3">
         <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center mb-2"
@@ -659,9 +948,11 @@
 
 <!-- ─── Footer ───────────────────────────────────────────────── -->
 <footer class="cl-footer">
-  <strong style="color:rgba(255,255,255,.8)">CanLand</strong> — Canadian Land Use Feasibility Platform &nbsp;·&nbsp;
-  Covers all 10 provinces &amp; 3 territories &nbsp;·&nbsp;
-  For preliminary assessment only. Always verify with the municipal planning authority.
+  <strong style="color:rgba(255,255,255,.85)">Plotline</strong> &nbsp;·&nbsp;
+  Canadian zoning &amp; bylaw lookup &nbsp;·&nbsp;
+  <a href="#coverage" style="color:rgba(255,255,255,.65)">Coverage</a> &nbsp;·&nbsp;
+  <a href="https://github.com/eokusany/Land-use-feasibility-tool" target="_blank" rel="noopener noreferrer" style="color:rgba(255,255,255,.65)">Source</a><br />
+  <span style="opacity:.7">Preliminary tool. Always verify with the municipal planning authority.</span>
 </footer>
 
 <!-- ── Scripts ──────────────────────────────────────────────── -->
@@ -703,6 +994,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadProvinces();
   await loadMuniCount();
   renderProvincePills();
+  document.querySelectorAll('#tryDemoBtn, #tryDemoBtnInline').forEach(btn =>
+    btn.addEventListener('click', runSampleAnalysis)
+  );
   showStep(0);
 });
 
@@ -724,19 +1018,56 @@ async function loadMuniCount() {
     const list = await res.json();
     document.getElementById('muniCount').textContent = list.length.toLocaleString();
   } catch(e) {
-    document.getElementById('muniCount').textContent = '88+';
+    document.getElementById('muniCount').textContent = '92';
   }
 }
+
+// Provinces that currently have at least one verified-zoning provider.
+// Updated when new providers are added.
+const VERIFIED_PROVINCES = new Set(['AB']);
 
 function renderProvincePills() {
   const pills = ['BC','AB','SK','MB','ON','QC','NB','NS','PE','NL','YT','NT','NU'];
   const container = document.getElementById('provincePills');
   pills.forEach(p => {
-    const el = document.createElement('span');
-    el.className = 'pill';
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'pill' + (VERIFIED_PROVINCES.has(p) ? ' verified' : '');
     el.textContent = p;
+    el.setAttribute('role', 'listitem');
+    el.setAttribute('aria-label',
+      VERIFIED_PROVINCES.has(p) ? `${p} — verified zoning available` : `${p} — bylaw lookup`);
+    el.addEventListener('click', () => selectProvinceFromPill(p));
     container.appendChild(el);
   });
+}
+
+function selectProvinceFromPill(code) {
+  // Set the province dropdown and trigger the city cascade
+  provinceSelect.value = code;
+  provinceSelect.dispatchEvent(new Event('change'));
+  // Scroll the form into view so the user knows something happened
+  document.getElementById('panelStep1').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Move focus to the city dropdown after the cascade resolves
+  setTimeout(() => citySelect.focus(), 400);
+}
+
+// Demo: pre-fill a known-good verified address and submit
+function runSampleAnalysis() {
+  // Set province → AB, cascade, set city → Edmonton, fill the address, submit
+  provinceSelect.value = 'AB';
+  provinceSelect.dispatchEvent(new Event('change'));
+  // The city dropdown populates asynchronously; wait for it
+  const waitForCity = setInterval(() => {
+    const hasEdmonton = Array.from(citySelect.options).some(o => o.value === 'Edmonton');
+    if (!hasEdmonton) return;
+    clearInterval(waitForCity);
+    citySelect.value = 'Edmonton';
+    addressInput.value = '1 Sir Winston Churchill Square, Edmonton, AB';
+    document.getElementById('propertyForm').dispatchEvent(new Event('submit', { cancelable: true }));
+  }, 60);
+  // Safety: stop polling after 3s
+  setTimeout(() => clearInterval(waitForCity), 3000);
 }
 
 // Province → city cascade
@@ -765,6 +1096,7 @@ provinceSelect.addEventListener('change', async () => {
 });
 
 // ── Step management ───────────────────────────────────────────
+let _isInitialStep = true;
 function showStep(idx) {
   [panelStep1, panelStep2, panelStep3, panelStep4].forEach((p, i) => {
     p.style.display = i === idx ? '' : 'none';
@@ -774,9 +1106,30 @@ function showStep(idx) {
   });
   stepBtns.forEach((btn, i) => {
     btn.classList.remove('active','done');
-    if (i < idx)  btn.classList.add('done');
-    if (i === idx) btn.classList.add('active');
+    btn.removeAttribute('aria-current');
+    if (i < idx) btn.classList.add('done');
+    if (i === idx) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-current', 'step');
+    }
   });
+  // On step transitions (not the initial render), scroll the active panel
+  // into view and move focus to its heading so screen-reader users get
+  // oriented. On initial load we leave the hero visible.
+  if (_isInitialStep) {
+    _isInitialStep = false;
+    return;
+  }
+  const panels = [panelStep1, panelStep2, panelStep3, panelStep4];
+  const active = panels[idx];
+  if (active) {
+    active.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const heading = active.querySelector('h1,h2,h3,h4,h5,h6,[tabindex="-1"]');
+    if (heading) {
+      heading.setAttribute('tabindex', '-1');
+      setTimeout(() => heading.focus({ preventScroll: true }), 50);
+    }
+  }
 }
 
 // ── Form submit ───────────────────────────────────────────────
@@ -907,9 +1260,7 @@ function renderResults(data) {
     const sectionLink = document.getElementById('resVerifiedBylawLink');
     if (policy.zone_bylaw_section_url) {
       sectionLink.innerHTML = `
-        <a href="${policy.zone_bylaw_section_url}" target="_blank" class="text-primary fw-semibold small">
-          <i class="fas fa-external-link-alt me-1"></i>Read the bylaw section for this zone
-        </a>
+        ${externalLink(policy.zone_bylaw_section_url, 'Read the bylaw section for this zone')}
         <div class="text-muted small mt-1"><em>This is the authoritative source for setbacks, height limits, density, and permitted uses for this zone.</em></div>`;
     } else {
       sectionLink.innerHTML = '';
@@ -944,9 +1295,7 @@ function renderResults(data) {
   const bylawDiv = document.getElementById('resBylawLink');
   const bylaw = policy.land_use_bylaw;
   if (bylaw && bylaw.url) {
-    bylawDiv.innerHTML = `<a href="${bylaw.url}" target="_blank" class="text-primary small">
-      <i class="fas fa-external-link-alt me-1"></i>${escapeHtml(bylaw.title || 'View Land Use Bylaw')}
-    </a>`;
+    bylawDiv.innerHTML = externalLink(bylaw.url, bylaw.title || 'View Land Use Bylaw', 'text-primary small');
   } else {
     bylawDiv.innerHTML = '<span class="text-muted small">No bylaw URL on file for this municipality. Visit the municipality website (Municipality tab) to locate it.</span>';
   }
@@ -961,30 +1310,28 @@ function renderResults(data) {
     devReqs.appendChild(li);
   });
 
-  // Municipality tab
+  // Municipality tab — all user-controlled fields HTML-escaped, all URLs sanitised.
   const ci = muni.contact_info || {};
+  const ptt = muni.typical_processing_times;
   document.getElementById('resMuniContact').innerHTML = `
-    <h6 class="fw-bold mb-2">${muni.name}</h6>
-    ${ci.phone   ? `<div class="contact-item"><i class="fas fa-phone"></i>${ci.phone}</div>` : ''}
-    ${ci.address ? `<div class="contact-item"><i class="fas fa-map-marker-alt"></i>${ci.address}</div>` : ''}
-    ${muni.planning_dept ? `<div class="contact-item"><i class="fas fa-envelope"></i>
-      <a href="mailto:${muni.planning_dept}">${muni.planning_dept}</a></div>` : ''}
-    ${muni.website ? `<div class="contact-item"><i class="fas fa-globe"></i>
-      <a href="${muni.website}" target="_blank">${muni.website}</a></div>` : ''}
-    ${muni.land_use_bylaw ? `<div class="contact-item"><i class="fas fa-book"></i>
-      <a href="${muni.land_use_bylaw}" target="_blank">Land Use Bylaw</a></div>` : ''}
+    <h6 class="fw-bold mb-2">${escapeHtml(muni.name || '')}</h6>
+    ${ci.phone   ? `<div class="contact-item"><i class="fas fa-phone" aria-hidden="true"></i>${externalLink('tel:' + ci.phone, ci.phone, '', '')}</div>` : ''}
+    ${ci.address ? `<div class="contact-item"><i class="fas fa-map-marker-alt" aria-hidden="true"></i>${escapeHtml(ci.address)}</div>` : ''}
+    ${muni.planning_dept ? `<div class="contact-item"><i class="fas fa-envelope" aria-hidden="true"></i>${externalLink('mailto:' + muni.planning_dept, muni.planning_dept, '', '')}</div>` : ''}
+    ${muni.website ? `<div class="contact-item"><i class="fas fa-globe" aria-hidden="true"></i>${externalLink(muni.website, muni.website, '', '')}</div>` : ''}
+    ${muni.land_use_bylaw ? `<div class="contact-item"><i class="fas fa-book" aria-hidden="true"></i>${externalLink(muni.land_use_bylaw, 'Land Use Bylaw', '', '')}</div>` : ''}
     <hr style="margin:.75rem 0" />
     <div class="row g-2 text-muted small">
-      <div class="col-6"><strong>Building Code:</strong><br>${muni.building_code || 'National Building Code'}</div>
-      <div class="col-6"><strong>Planning Act:</strong><br>${muni.planning_act || '—'}</div>
+      <div class="col-6"><strong>Building Code:</strong><br>${escapeHtml(muni.building_code || 'National Building Code')}</div>
+      <div class="col-6"><strong>Planning Act:</strong><br>${escapeHtml(muni.planning_act || '—')}</div>
     </div>
-    ${muni.typical_processing_times ? `
+    ${ptt ? `
     <hr style="margin:.75rem 0" />
     <div class="text-muted small"><strong>Typical Processing Times</strong>
       <ul class="mt-1 mb-0">
-        <li>Development permit: ${muni.typical_processing_times.development_permit}</li>
-        <li>Subdivision: ${muni.typical_processing_times.subdivision}</li>
-        <li>Rezoning: ${muni.typical_processing_times.rezoning}</li>
+        <li>Development permit: ${escapeHtml(ptt.development_permit || '—')}</li>
+        <li>Subdivision: ${escapeHtml(ptt.subdivision || '—')}</li>
+        <li>Rezoning: ${escapeHtml(ptt.rezoning || '—')}</li>
       </ul>
     </div>` : ''}
   `;
@@ -1004,7 +1351,7 @@ function renderResults(data) {
   });
   allActions.forEach((a, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<span class="action-num">${i+1}</span><span>${a}</span>`;
+    li.innerHTML = `<span class="action-num">${i+1}</span><span>${escapeHtml(a)}</span>`;
     actionsList.appendChild(li);
   });
 
@@ -1069,8 +1416,10 @@ document.getElementById('downloadReportBtn').addEventListener('click', async () 
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      alert('Report generation failed: ' + (err.error || 'Unknown error'));
+      let errText = 'Unknown error';
+      try { errText = (await res.json()).error || errText; } catch (_) {}
+      showError('Report generation failed: ' + errText);
+      showStep(2);
       return;
     }
 
@@ -1089,7 +1438,8 @@ document.getElementById('downloadReportBtn').addEventListener('click', async () 
     stepBtns[3].classList.add('done');
 
   } catch(err) {
-    alert('Network error: ' + err.message);
+    showError('Network error generating report: ' + (err && err.message ? err.message : 'try again'));
+    showStep(2);
   } finally {
     btn.disabled = false;
     loading.style.display = 'none';
@@ -1099,10 +1449,13 @@ document.getElementById('downloadReportBtn').addEventListener('click', async () 
 // ── Helpers ───────────────────────────────────────────────────
 function showError(msg) {
   errorDiv.style.display = 'block';
-  errorDiv.innerHTML = `<i class="fas fa-circle-exclamation me-2"></i>${msg}`;
+  errorDiv.setAttribute('role', 'alert');
+  errorDiv.innerHTML = `<i class="fas fa-circle-exclamation me-2" aria-hidden="true"></i>${escapeHtml(msg)}`;
+  errorDiv.focus();
 }
 function hideError() {
   errorDiv.style.display = 'none';
+  errorDiv.removeAttribute('role');
 }
 function cap(str) {
   if (!str) return '';
@@ -1116,6 +1469,25 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/* Sanitise a URL before injecting it into an href attribute.
+   Allows http(s), mailto, tel — rejects javascript:, data:, etc.
+   Returns '' for anything unsafe or empty. */
+function safeUrl(s) {
+  if (!s) return '';
+  const str = String(s).trim();
+  if (/^(?:https?:|mailto:|tel:)/i.test(str)) return str;
+  // Allow relative URLs (start with / or #) too
+  if (/^[\/#?]/.test(str)) return str;
+  return '';
+}
+
+/* Build an external link safely. Returns sanitised HTML. */
+function externalLink(url, text, classes = 'text-primary fw-semibold small', iconHtml = '<i class="fas fa-external-link-alt me-1" aria-hidden="true"></i>') {
+  const safe = safeUrl(url);
+  if (!safe) return `<span class="text-muted small">${escapeHtml(text || '')}</span>`;
+  return `<a href="${escapeHtml(safe)}" target="_blank" rel="noopener noreferrer" class="${classes}">${iconHtml}${escapeHtml(text || safe)}</a>`;
 }
 </script>
 </body>

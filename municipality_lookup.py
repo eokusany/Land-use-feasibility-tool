@@ -134,18 +134,70 @@ class MunicipalityLookup:
 
         return None
 
+    # Capitalised words that are NOT place names. Without this filter
+    # `_extract_names` returns every street suffix, direction, and ordinal
+    # from the address and tries each as a candidate municipality.
+    _STOPLIST = frozenset(
+        w.lower()
+        for w in {
+            # street suffixes
+            "Street", "St", "Avenue", "Ave", "Road", "Rd", "Drive", "Dr",
+            "Lane", "Ln", "Boulevard", "Blvd", "Way", "Circle", "Cir",
+            "Court", "Ct", "Crescent", "Cres", "Place", "Pl", "Terrace", "Tr",
+            "Highway", "Hwy", "Route", "Trail",
+            # directions
+            "North", "South", "East", "West", "NW", "NE", "SW", "SE",
+            "Northwest", "Northeast", "Southwest", "Southeast",
+            # geometry / land-description keywords
+            "Lot", "Block", "Plan", "Parcel", "Section", "Township", "Range",
+            "Quarter", "PID", "RR", "Rural",
+            # generic words / units
+            "Unit", "Suite", "Apt", "Apartment", "Floor", "Building",
+            # provinces / country
+            "Canada", "Alberta", "BC", "AB", "SK", "MB", "ON", "QC", "NB",
+            "NS", "PE", "NL", "YT", "NT", "NU",
+            "British", "Columbia", "Saskatchewan", "Manitoba", "Ontario",
+            "Quebec", "Brunswick", "Scotia", "Edward", "Island", "Newfoundland",
+            "Labrador", "Yukon", "Northwest", "Territories", "Nunavut",
+            # months (sometimes appear in legal descriptions)
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        }
+    )
+
     def _extract_names(self, text: str) -> List[str]:
-        """Extract capitalised word groups that might be place names."""
+        """Extract capitalised word groups that might be place names.
+
+        Filters against a stoplist of common capitalised non-place words
+        so candidates like "Avenue" or "North" don't shadow real cities.
+        """
+        if not text:
+            return []
         words = text.split()
-        hints = []
+        hints: List[str] = []
+        seen = set()
+
+        def _accept(token: str) -> bool:
+            return (
+                bool(token)
+                and token[0].isupper()
+                and len(token) > 2
+                and token.lower() not in self._STOPLIST
+                and not token.isdigit()
+            )
+
         for i, word in enumerate(words):
-            clean = word.strip(".,;:()")
-            if clean and clean[0].isupper() and len(clean) > 2:
+            clean = word.strip(".,;:()'\"")
+            if _accept(clean) and clean not in seen:
+                seen.add(clean)
                 hints.append(clean)
-                if i + 1 < len(words):
-                    next_clean = words[i + 1].strip(".,;:()")
-                    if next_clean and next_clean[0].isupper():
-                        hints.append(f"{clean} {next_clean}")
+            if i + 1 < len(words):
+                next_clean = words[i + 1].strip(".,;:()'\"")
+                if _accept(clean) and _accept(next_clean):
+                    pair = f"{clean} {next_clean}"
+                    if pair not in seen:
+                        seen.add(pair)
+                        hints.append(pair)
         return hints
 
     def _enrich(self, m: Dict) -> Dict:

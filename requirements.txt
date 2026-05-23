@@ -1,8 +1,14 @@
 flask==2.3.3
 requests==2.31.0
+requests-cache==1.2.1
 geopy==2.4.0
 reportlab==4.0.4
 python-dotenv==1.0.0
 jinja2==3.1.2
 werkzeug==2.3.7
 gunicorn==21.2.0
+
+# Test-only (not pinned to keep CI matrix simple)
+pytest==8.3.4
+pytest-playwright==0.6.2
+playwright==1.49.1

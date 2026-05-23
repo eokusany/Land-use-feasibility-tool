@@ -13,6 +13,7 @@ PROVIDERS below.
 from typing import Dict, Optional, Type
 
 from .base import ZoningProvider, ZoningResult, ProviderError
+from .calgary import CalgaryZoningProvider
 from .edmonton import EdmontonZoningProvider
 
 
@@ -20,6 +21,7 @@ from .edmonton import EdmontonZoningProvider
 # municipality name CanLand has already resolved (not on raw user input),
 # so this stays a small, deliberate list.
 PROVIDERS: Dict[str, Type[ZoningProvider]] = {
+    "calgary": CalgaryZoningProvider,
     "edmonton": EdmontonZoningProvider,
 }
 

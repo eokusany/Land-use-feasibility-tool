@@ -17,8 +17,6 @@ address. The R-1 / R-2 / R-3 codes were retired by Bylaw 20001 in January
 from datetime import datetime, timezone
 from typing import List, Optional
 
-import requests
-
 from .base import ProviderError, ZoningOverlay, ZoningProvider, ZoningResult
 
 
@@ -126,32 +124,3 @@ class EdmontonZoningProvider(ZoningProvider):
                 bylaw_no=(row.get("bylaw_no") or "").strip() or None,
             ))
         return overlays
-
-    def _get_json(self, url: str, params: dict) -> list:
-        try:
-            resp = requests.get(
-                url,
-                params=params,
-                timeout=self.timeout,
-                headers={"Accept": "application/json", "User-Agent": "canland_feasibility_tool/1.0"},
-            )
-        except requests.RequestException as exc:
-            raise ProviderError(f"Edmonton zoning API unreachable: {exc}") from exc
-
-        if resp.status_code != 200:
-            raise ProviderError(
-                f"Edmonton zoning API returned HTTP {resp.status_code} for {url}"
-            )
-
-        try:
-            data = resp.json()
-        except ValueError as exc:
-            raise ProviderError(f"Edmonton zoning API returned non-JSON response: {exc}") from exc
-
-        if isinstance(data, dict) and data.get("error"):
-            raise ProviderError(f"Edmonton zoning API error: {data.get('message', data)}")
-
-        if not isinstance(data, list):
-            raise ProviderError(f"Edmonton zoning API returned unexpected shape: {type(data).__name__}")
-
-        return data

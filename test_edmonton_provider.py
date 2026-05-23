@@ -60,7 +60,7 @@ class EdmontonProviderUnitTests(unittest.TestCase):
         self.provider = EdmontonZoningProvider()
 
     def test_successful_lookup_returns_zone_and_overlays(self):
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.side_effect = [
                 _mock_response(ZONE_HIT),
                 _mock_response(OVERLAYS_HIT),
@@ -78,13 +78,13 @@ class EdmontonProviderUnitTests(unittest.TestCase):
 
     def test_no_polygon_hit_returns_none(self):
         """Query outside Edmonton — Socrata returns []."""
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.return_value = _mock_response([])
             result = self.provider.lookup(43.6532, -79.3832)  # Toronto
         self.assertIsNone(result)
 
     def test_dc2_zone_attaches_provider_note(self):
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.side_effect = [
                 _mock_response(DC2_HIT),
                 _mock_response([]),
@@ -97,7 +97,7 @@ class EdmontonProviderUnitTests(unittest.TestCase):
 
     def test_overlay_failure_does_not_break_zone_lookup(self):
         """If overlays endpoint errors, we still return the base zone."""
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.side_effect = [
                 _mock_response(ZONE_HIT),
                 _mock_response({"error": True, "message": "boom"}),  # overlays fail
@@ -110,25 +110,25 @@ class EdmontonProviderUnitTests(unittest.TestCase):
 
     def test_network_error_raises_provider_error(self):
         import requests as _r
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.side_effect = _r.ConnectionError("nope")
             with self.assertRaises(ProviderError):
                 self.provider.lookup(53.5444, -113.4909)
 
     def test_http_500_raises_provider_error(self):
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.return_value = _mock_response([], status=500)
             with self.assertRaises(ProviderError):
                 self.provider.lookup(53.5444, -113.4909)
 
     def test_socrata_error_object_raises_provider_error(self):
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.return_value = _mock_response({"error": True, "message": "bad query"})
             with self.assertRaises(ProviderError):
                 self.provider.lookup(53.5444, -113.4909)
 
     def test_polygon_hit_with_empty_zone_code_raises(self):
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.return_value = _mock_response([{"zoning": "", "description": "?", "url": ""}])
             with self.assertRaises(ProviderError):
                 self.provider.lookup(53.5444, -113.4909)
@@ -176,7 +176,7 @@ class PolicyRetrievalIntegrationTests(unittest.TestCase):
         }
 
     def test_verified_path_populates_zone_fields(self):
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.side_effect = [
                 _mock_response(ZONE_HIT),
                 _mock_response(OVERLAYS_HIT),
@@ -203,7 +203,7 @@ class PolicyRetrievalIntegrationTests(unittest.TestCase):
 
     def test_provider_network_failure_falls_back_gracefully(self):
         import requests as _r
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.side_effect = _r.ConnectionError("offline")
             policy = self.pr.get_land_use_policies(self.muni, self.prop_with_coords)
 
@@ -213,7 +213,7 @@ class PolicyRetrievalIntegrationTests(unittest.TestCase):
         self.assertIn("unavailable", policy["verification_message"])
 
     def test_outside_coverage_marks_outside_coverage(self):
-        with patch("zoning_providers.edmonton.requests.get") as mock_get:
+        with patch("zoning_providers.base.requests.get") as mock_get:
             mock_get.return_value = _mock_response([])  # no polygon hit
             policy = self.pr.get_land_use_policies(
                 self.muni,

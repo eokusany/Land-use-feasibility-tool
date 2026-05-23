@@ -1,10 +1,27 @@
 # Option B — Real Per-City Zoning Lookup
 
+## Status
+
+- [x] **Edmonton** — shipped 2026-04-08, commit `a3a9aac` (see [SUMMARY.md](SUMMARY.md))
+- [x] **Calgary** — shipped 2026-05-23 (see [IMPROVEMENTS_SUMMARY.md](IMPROVEMENTS_SUMMARY.md))
+- [ ] Toronto, Vancouver, Ottawa, Montreal, Winnipeg, Halifax — pending
+- [x] **Shared `_get_json` helper** — shipped 2026-05-23 (lifted to `ZoningProvider.base`)
+- [x] **TTL cache** — shipped 2026-05-23 (10 min default, 256 entries, env-tunable)
+- [x] **Geocode-in-boundary check** — shipped 2026-05-23 (centroid-distance, 80 km default)
+- [x] **Metrics / observability** — shipped 2026-05-23 (provider/status/latency logged)
+- [ ] **Rate limiting / Socrata app tokens** — still pending (requires real token)
+
+**Current rollout plan:** collect real user feedback on the Edmonton
+deployment first. Only scale to the next Tier 1 city once we've validated
+the verified-zone UX, the overlay display, and the DC1/DC2 note pattern
+with at least a handful of real Edmonton users.
+
 ## Why this exists
 
-Option A (currently shipped) makes CanLand honest: it identifies the
-municipality, links to the bylaw and planning department, and clearly tells
-the user that parcel-level zoning must be verified directly with the city.
+Option A (shipped for every city except Edmonton) makes CanLand honest: it
+identifies the municipality, links to the bylaw and planning department, and
+clearly tells the user that parcel-level zoning must be verified directly
+with the city.
 
 Option B is the work needed to **actually retrieve parcel-level zoning** for
 the cities CanLand supports — replacing the verification callout with a real
@@ -55,20 +72,70 @@ The UI should clearly distinguish "verified from city open data" vs
 
 ---
 
-## Tier 1 cities (start here)
+## Canada-wide scale plan
+
+The Edmonton provider is the reference implementation for every other city.
+The pattern to follow for each new city:
+
+1. Find the city's open-data portal and locate the zoning dataset. Prefer
+   Socrata → ArcGIS REST → OpenDataSoft → downloadable GeoJSON, in that order
+   (Socrata's SoQL `intersects()` is the cleanest point-in-polygon query).
+2. Capture a real API response for at least one known downtown address and
+   save it as mocked test fixtures (matches `ZONE_HIT` / `OVERLAYS_HIT` in
+   [test_edmonton_provider.py](test_edmonton_provider.py)).
+3. Implement `zoning_providers/<city>.py` subclassing `ZoningProvider`.
+   Mirror the Edmonton structure: `_query_zone` / `_query_overlays` /
+   `_get_json`, raising `ProviderError` on network or shape failures,
+   returning `None` on no-polygon-hit.
+4. Add site-specific notes for any zones that don't have generic rules
+   (Vancouver CD-1, Toronto site-specific exceptions, etc.).
+5. Register the class in [zoning_providers/__init__.py](zoning_providers/__init__.py).
+   Use the exact municipality name CanLand resolves (not raw user input).
+6. Write tests in `test_<city>_provider.py`: successful lookup, no-hit,
+   malformed response, HTTP error, network error, missing coordinates, and
+   a `RUN_LIVE_TESTS`-gated live integration test.
+7. Verify against the live API before merging.
+8. Ship one city per PR. Do not batch.
+
+### Provider-layer improvements (apply before Toronto)
+
+Lessons from the Edmonton rollout that should become shared infrastructure
+in [zoning_providers/base.py](zoning_providers/base.py) rather than copy-pasted
+into each new provider:
+
+- [ ] **Shared HTTP helper** — the `_get_json` method in the Edmonton provider
+  handles timeouts, non-200s, JSON errors, Socrata error objects, and shape
+  validation. Lift it to `ZoningProvider._get_json` so Toronto/Vancouver don't
+  reimplement error handling.
+- [ ] **Per-request cache** — the `PolicyRetrieval.policy_cache` is unbounded
+  and lives for the life of the Python process. On a long-running Render
+  instance this could serve a cached zone after the city amends it. Add a
+  TTL (30 min max) or move caching to per-request only.
+- [ ] **Geocode-in-boundary check** — the original bug was partly a geocoder
+  failure (Nominatim resolved a downtown address to west Edmonton). Before
+  calling any provider, verify the geocoded point is inside the selected
+  municipality's boundary polygon. Otherwise provider returns `None`
+  (outside_coverage) and users think the address isn't in the city.
+- [ ] **Metrics / observability** — log (provider_name, status, latency_ms)
+  for every lookup so we can see in production which cities are healthy,
+  which are timing out, and how often we're falling back to Option A.
+- [ ] **Rate limiting** — Socrata's default limit is ~1000 req/hr without an
+  app token. With real user traffic across Tier 1 cities we'll hit that. Add
+  per-provider app tokens via env vars and document in SUMMARY.md.
+
+## Tier 1 cities
 
 These all expose zoning polygons via public APIs. Listed in priority order
 based on population and how clean the API is.
 
-### 1. Edmonton, AB  ⭐ start here (this is the bug-report city)
+### 1. Edmonton, AB  ✅ SHIPPED 2026-04-08 (commit `a3a9aac`)
 - Portal: https://data.edmonton.ca
-- Dataset: "Zoning (Bylaw 20001)" — ArcGIS REST FeatureServer
-- Endpoint pattern: `https://services.arcgis.com/.../FeatureServer/0/query?geometry=<lon>,<lat>&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json`
-- Returns: zone code (e.g. `RS`, `CMU1`, `MU`), zone description, bylaw section
-- Note: Edmonton **retired the old R-1/R-2/R-3 system** when Bylaw 20001 took
-  effect in January 2024. The hardcoded codes that used to live in
-  `policy_retrieval.PROVINCE_ZONING["AB"]` are obsolete for Edmonton.
-- Bylaw: https://www.edmonton.ca/city_government/urban_planning_and_design/zoning-bylaw-renewal
+- Dataset: "Zoning Bylaw Geographical Data" (fixa-tstc) + "Zoning Overlays" (6w3s-58pv)
+- Socrata SoQL `intersects()` point-in-polygon query
+- Implementation: [zoning_providers/edmonton.py](zoning_providers/edmonton.py)
+- Tests: [test_edmonton_provider.py](test_edmonton_provider.py) — 18 tests
+- Bylaw 20001 (effective January 2024) retired the old R-1/R-2/R-3 system
+- DC1/DC2 site-specific zones get provider notes
 
 ### 2. Toronto, ON
 - Portal: https://open.toronto.ca
@@ -114,25 +181,41 @@ based on population and how clean the API is.
 
 ---
 
-## Implementation steps
+## Tier 2+ cities (after Tier 1 is complete)
 
-1. **Create the provider interface** (`zoning_providers/base.py`)
-2. **Build the Edmonton provider first** (`zoning_providers/edmonton.py`)
-   - Hardcode the FeatureServer URL
-   - Query by lon/lat, parse the response, return `ZoningResult`
-   - Handle: no hit, multiple hits, network timeout, malformed response
-   - Add a unit test that mocks the HTTP call with a real captured response
-   - Add an integration test gated by `RUN_LIVE_TESTS=1` env var that hits
-     the actual API
-3. **Wire it into `PolicyRetrieval`**
-   - Provider registry: `{municipality_name (lowercased): ProviderClass}`
-   - In `get_land_use_policies`, look up provider; on success return real
-     data with `verification_required: False` (or `verification_recommended`)
-4. **Update the UI** to show "Verified from City of Edmonton open data"
-   instead of the verification banner when a provider returns a result
-5. **Update the PDF** the same way (different banner colour, source line
-   under the zone code)
-6. **Repeat for Tier 1 cities** in priority order. Each city is its own PR.
+Once the Tier 1 cities are all shipped, broaden coverage to mid-size cities
+that have decent open-data portals:
+
+- Mississauga, Brampton, Hamilton, Surrey, Burnaby, Richmond, Markham,
+  Vaughan, Kitchener, London, Windsor, Victoria, Saskatoon, Regina,
+  Quebec City, Laval, Gatineau, Longueuil, St. John's, Charlottetown
+
+For each, the playbook is identical to the Tier 1 rollout above. Skip any
+city whose zoning data isn't published (fall back to Option A permanently).
+
+## Long tail (Option A forever)
+
+For the remaining ~70 cities in `canada_municipalities.py` that don't
+publish zoning as open data, CanLand stays in Option A mode indefinitely.
+The honest verification-required banner is the correct answer — we don't
+need a provider for every municipality.
+
+## Feedback loop for real users
+
+Before scaling past Edmonton, collect feedback on these questions from
+Edmonton users:
+
+- [ ] Is the "Verified" badge and source attribution clear enough that users
+  trust the zone code?
+- [ ] Is the overlays list understandable, or does it need an explainer?
+- [ ] Do DC1/DC2 provider notes prevent users from assuming generic rules?
+- [ ] What do users actually do next after seeing a verified zone — do they
+  click the bylaw section link? Do they contact the planning department?
+- [ ] How often does `provider_failed` / `outside_coverage` fire in the wild,
+  and is the messaging helpful when it does?
+
+Decisions informed by that feedback should be applied to the shared provider
+layer (see "Provider-layer improvements" above) before Toronto goes in.
 
 ---
 

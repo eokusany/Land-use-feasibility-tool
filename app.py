@@ -1,10 +1,61 @@
-from flask import Flask, render_template, request, jsonify, send_file
+"""CanLand Flask application — entrypoint and HTTP routes."""
+
+import logging
 import os
+import sys
+import time
+import uuid
 from datetime import datetime
-from property_parser import PropertyParser
+
+from flask import Flask, g, jsonify, render_template, request, send_file
+
+from http_cache import install_http_cache_if_configured
 from municipality_lookup import MunicipalityLookup
 from policy_retrieval import PolicyRetrieval
+from property_parser import PropertyParser
 from report_generator import ReportGenerator
+
+# Install the shared HTTP cache for municipal API calls *before* any provider
+# imports its requests session. No-op unless CANLAND_HTTP_CACHE_PATH is set.
+install_http_cache_if_configured()
+
+
+# ---------------------------------------------------------------------------
+# Logging — structured-ish, stdout-friendly so Render captures it cleanly
+# ---------------------------------------------------------------------------
+
+LOG_LEVEL = os.environ.get("CANLAND_LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s",
+    stream=sys.stdout,
+)
+
+
+class _RequestIdFilter(logging.Filter):
+    def filter(self, record):  # noqa: D401
+        record.request_id = getattr(g, "request_id", "-") if _has_app_context() else "-"
+        return True
+
+
+def _has_app_context():
+    try:
+        from flask import has_app_context
+
+        return has_app_context()
+    except Exception:  # noqa: BLE001
+        return False
+
+
+for _h in logging.getLogger().handlers:
+    _h.addFilter(_RequestIdFilter())
+
+logger = logging.getLogger("canland.app")
+
+
+# ---------------------------------------------------------------------------
+# App + service singletons
+# ---------------------------------------------------------------------------
 
 app = Flask(__name__)
 
@@ -14,9 +65,56 @@ policy_retrieval = PolicyRetrieval()
 report_generator = ReportGenerator()
 
 
+@app.before_request
+def _attach_request_id():
+    g.request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+    g.t_start = time.perf_counter()
+
+
+@app.after_request
+def _log_response(response):
+    try:
+        elapsed_ms = round((time.perf_counter() - g.t_start) * 1000, 1)
+    except Exception:  # noqa: BLE001 — defensive
+        elapsed_ms = -1
+    logger.info(
+        "%s %s -> %s in %sms",
+        request.method,
+        request.path,
+        response.status_code,
+        elapsed_ms,
+    )
+    response.headers["X-Request-ID"] = getattr(g, "request_id", "-")
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/health")
+def health():
+    """Liveness/readiness check. Returns provider registry size so deploys can
+    confirm the import graph loaded cleanly."""
+    from zoning_providers import PROVIDERS
+
+    http_cache_active = bool(os.environ.get("CANLAND_HTTP_CACHE_PATH"))
+    return jsonify(
+        {
+            "status": "ok",
+            "service": "canland",
+            "providers_registered": sorted(PROVIDERS.keys()),
+            "municipalities": len(municipality_lookup.get_supported_municipalities()),
+            "http_cache_enabled": http_cache_active,
+            "time": datetime.utcnow().isoformat() + "Z",
+        }
+    )
 
 
 @app.route("/api/provinces")
@@ -35,10 +133,10 @@ def get_cities(province_code):
 @app.route("/api/analyze_property", methods=["POST"])
 def analyze_property():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
-        province = data.get("province", "")
-        city = data.get("city", "")
+        province = (data.get("province") or "").strip()
+        city = (data.get("city") or "").strip()
 
         property_info = property_parser.parse_property_info(
             address=data.get("address", ""),
@@ -48,18 +146,34 @@ def analyze_property():
         )
 
         if not property_info:
-            return jsonify({"error": "Unable to parse property information. Please provide an address or description."}), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Unable to parse property information. "
+                        "Please provide an address or description."
+                    }
+                ),
+                400,
+            )
 
         # Prefer explicit city/province selection from the UI
         if city and province:
             municipality_info = municipality_lookup.find_by_province_and_city(province, city)
         else:
-            municipality_info = municipality_lookup.find_municipality(property_info, province_hint=province or None)
+            municipality_info = municipality_lookup.find_municipality(
+                property_info, province_hint=province or None
+            )
 
         if not municipality_info:
-            return jsonify({
-                "error": "Municipality not found. Try selecting a province and city from the dropdowns, or check your address."
-            }), 404
+            return (
+                jsonify(
+                    {
+                        "error": "Municipality not found. Try selecting a province and "
+                        "city from the dropdowns, or check your address."
+                    }
+                ),
+                404,
+            )
 
         policy_info = policy_retrieval.get_land_use_policies(municipality_info, property_info)
 
@@ -69,31 +183,56 @@ def analyze_property():
             "policy_info": policy_info,
             "analysis_date": datetime.now().isoformat(),
             "feasibility_summary": _generate_feasibility_summary(policy_info),
+            "request_id": getattr(g, "request_id", None),
         }
 
         return jsonify(results)
 
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+    except Exception:  # noqa: BLE001 — sanitise raw exception text from the client
+        logger.exception("analyze_property failed")
+        return (
+            jsonify(
+                {
+                    "error": "Internal error while analyzing property. "
+                    "The incident has been logged.",
+                    "request_id": getattr(g, "request_id", None),
+                }
+            ),
+            500,
+        )
 
 
 @app.route("/api/generate_report", methods=["POST"])
 def generate_report():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         report_path = report_generator.create_report(data)
         return send_file(
             report_path,
             as_attachment=True,
             download_name=f"canland_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
         )
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+    except Exception:  # noqa: BLE001
+        logger.exception("generate_report failed")
+        return (
+            jsonify(
+                {
+                    "error": "Internal error while generating the report.",
+                    "request_id": getattr(g, "request_id", None),
+                }
+            ),
+            500,
+        )
 
 
 @app.route("/api/municipalities")
 def get_municipalities():
     return jsonify(municipality_lookup.get_supported_municipalities())
+
+
+# ---------------------------------------------------------------------------
+# Feasibility summary
+# ---------------------------------------------------------------------------
 
 
 def _generate_feasibility_summary(policy_info: dict) -> dict:
@@ -135,7 +274,9 @@ def _generate_feasibility_summary(policy_info: dict) -> dict:
         recommended_actions += [
             "Confirm any site-specific amendments or discretionary variances with the municipality",
             "Contact the municipal planning department for site-specific guidance",
-            f"Confirm compliance with {province} provincial planning legislation" if province else "Confirm compliance with provincial planning legislation",
+            f"Confirm compliance with {province} provincial planning legislation"
+            if province
+            else "Confirm compliance with provincial planning legislation",
             "Engage a qualified land use planner before making development decisions",
         ]
 
@@ -159,7 +300,9 @@ def _generate_feasibility_summary(policy_info: dict) -> dict:
         "Look up the parcel on the municipality's online zoning map",
         "Contact the municipal planning department to confirm the current zone designation",
         "Request a Letter of Compliance or Zoning Memo for the legal title",
-        f"Confirm compliance with {province} provincial planning legislation" if province else "Confirm compliance with provincial planning legislation",
+        f"Confirm compliance with {province} provincial planning legislation"
+        if province
+        else "Confirm compliance with provincial planning legislation",
         "Engage a qualified land use planner before making development decisions",
     ]
 

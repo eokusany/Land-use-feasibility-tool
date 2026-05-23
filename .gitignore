@@ -66,3 +66,15 @@ instance/
 
 # MCP config (contains env var refs — keep local)
 .mcp.json
+
+# Claude Code — keep the shared allowlist (settings.json), drop the personal one
+.claude/settings.local.json
+
+# Test artifacts
+.pytest_cache/
+test-results/
+playwright-report/
+
+# requests-cache SQLite files (local dev only)
+*.sqlite
+canland_cache*

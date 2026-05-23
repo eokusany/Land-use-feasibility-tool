@@ -24,12 +24,19 @@ municipal planning department."
 import hashlib
 import json
 import logging
+import os
 import time
-from typing import Dict, List, Optional
+from collections import OrderedDict
+from typing import Dict, List, Optional, Tuple
 
 from zoning_providers import ProviderError, ZoningResult, get_provider
 
 logger = logging.getLogger(__name__)
+
+# Cache zoning lookups for at most this many seconds. Bylaws amend frequently,
+# so we keep this short. Tunable via env vars for production deploys.
+CACHE_TTL_SECONDS = int(os.environ.get("CANLAND_POLICY_CACHE_TTL", "600"))
+CACHE_MAX_ENTRIES = int(os.environ.get("CANLAND_POLICY_CACHE_MAX", "256"))
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +79,8 @@ class PolicyRetrieval:
     """
 
     def __init__(self):
-        self.policy_cache: Dict[str, Dict] = {}
+        # OrderedDict gives us O(1) LRU eviction. Values are (expires_at, dict).
+        self.policy_cache: "OrderedDict[str, Tuple[float, Dict]]" = OrderedDict()
 
     # ------------------------------------------------------------------
     # Public API
@@ -80,8 +88,9 @@ class PolicyRetrieval:
 
     def get_land_use_policies(self, municipality_info: Dict, property_info: Dict) -> Dict:
         cache_key = self._cache_key(municipality_info, property_info)
-        if cache_key in self.policy_cache:
-            return self.policy_cache[cache_key]
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
 
         muni_name = municipality_info.get("name", "")
         province = municipality_info.get("province") or None
@@ -143,8 +152,30 @@ class PolicyRetrieval:
 
         self._try_upgrade_with_provider(policy_info, municipality_info, property_info)
 
-        self.policy_cache[cache_key] = policy_info
+        self._cache_put(cache_key, policy_info)
         return policy_info
+
+    # ------------------------------------------------------------------
+    # Bounded TTL cache helpers
+    # ------------------------------------------------------------------
+
+    def _cache_get(self, key: str) -> Optional[Dict]:
+        entry = self.policy_cache.get(key)
+        if entry is None:
+            return None
+        expires_at, value = entry
+        if time.time() > expires_at:
+            self.policy_cache.pop(key, None)
+            return None
+        # Mark recent — move to end for LRU semantics
+        self.policy_cache.move_to_end(key)
+        return value
+
+    def _cache_put(self, key: str, value: Dict) -> None:
+        self.policy_cache[key] = (time.time() + CACHE_TTL_SECONDS, value)
+        self.policy_cache.move_to_end(key)
+        while len(self.policy_cache) > CACHE_MAX_ENTRIES:
+            self.policy_cache.popitem(last=False)
 
     # ------------------------------------------------------------------
     # Provider integration
@@ -173,10 +204,35 @@ class PolicyRetrieval:
             )
             return
 
+        # Sanity-check the geocode against the municipality centroid before
+        # hitting the provider. Catches the failure mode that motivated this
+        # whole effort: Nominatim returning a point hundreds of km from where
+        # the user actually meant. We import lazily to avoid a circular dep
+        # at module import time.
+        try:
+            from property_parser import is_point_within_municipality
+            in_bounds, dist_km = is_point_within_municipality(
+                float(lat), float(lon), municipality_info
+            )
+        except Exception:  # noqa: BLE001 — boundary check is a hint, never fatal
+            in_bounds, dist_km = True, 0.0
+
+        if not in_bounds:
+            policy_info["verification_status"] = "outside_coverage"
+            policy_info["verification_message"] = (
+                f"The geocoded coordinates are ~{dist_km:.0f} km from "
+                f"{provider.municipality}'s centre. The geocoder may have "
+                "returned the wrong location for this address. Try entering "
+                "more specific information (postal code, intersection, or a "
+                "neighbourhood name)."
+            )
+            return
+
+        t0 = time.perf_counter()
         try:
             result: Optional[ZoningResult] = provider.lookup(float(lat), float(lon))
         except ProviderError as exc:
-            logger.warning("Zoning provider %s failed: %s", provider.name, exc)
+            self._log_provider_call(provider, "provider_failed", t0, error=str(exc))
             policy_info["verification_status"] = "provider_failed"
             policy_info["verification_message"] = (
                 f"{provider.municipality} zoning service is currently unavailable "
@@ -185,7 +241,7 @@ class PolicyRetrieval:
             )
             return
         except Exception as exc:  # noqa: BLE001 — defensive: never let a provider crash CanLand
-            logger.exception("Zoning provider %s raised unexpected exception", provider.name)
+            self._log_provider_call(provider, "provider_failed", t0, error=str(exc), unexpected=True)
             policy_info["verification_status"] = "provider_failed"
             policy_info["verification_message"] = (
                 f"{provider.municipality} zoning lookup encountered an unexpected error: {exc}"
@@ -193,6 +249,7 @@ class PolicyRetrieval:
             return
 
         if result is None:
+            self._log_provider_call(provider, "outside_coverage", t0)
             policy_info["verification_status"] = "outside_coverage"
             policy_info["verification_message"] = (
                 f"The geocoded coordinates do not fall inside any {provider.municipality} "
@@ -200,6 +257,8 @@ class PolicyRetrieval:
                 "may have returned the wrong location."
             )
             return
+
+        self._log_provider_call(provider, "verified", t0, zone=result.zone_code)
 
         # Success — upgrade to verified mode
         policy_info["verification_required"] = False
@@ -222,6 +281,21 @@ class PolicyRetrieval:
         policy_info["zone_retrieved_at"] = result.retrieved_at
         policy_info["zone_bylaw_section_url"] = result.bylaw_section_url
         policy_info["zone_provider_notes"] = list(result.provider_notes)
+
+    # ------------------------------------------------------------------
+    # Observability
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _log_provider_call(provider, status: str, t0: float, **extra) -> None:
+        elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+        parts = [f"provider={provider.name}", f"status={status}", f"latency_ms={elapsed_ms}"]
+        for key, value in extra.items():
+            parts.append(f"{key}={value!r}")
+        if status in {"provider_failed"}:
+            logger.warning("zoning_lookup " + " ".join(parts))
+        else:
+            logger.info("zoning_lookup " + " ".join(parts))
 
     # ------------------------------------------------------------------
     # Internals
