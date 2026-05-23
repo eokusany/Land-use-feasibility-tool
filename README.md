@@ -108,16 +108,25 @@ curl http://localhost:5001/api/health
 ### Run tests
 
 ```bash
-# Backend unit tests (mocked, ~0.4s)
+# Backend unit tests (mocked, ~0.4s) — runs against production deps only
 python -m unittest discover -v
 
 # Backend with live municipal-API integration tests
 RUN_LIVE_TESTS=1 python -m unittest test_edmonton_provider.py test_calgary_provider.py
 
-# Playwright end-to-end UI tests (boots Flask in-process, headless chromium)
+# Playwright end-to-end UI tests — requires dev deps (pytest, playwright)
+pip install -r requirements-dev.txt
 python -m playwright install chromium     # one-time
 python -m pytest tests_e2e/ -v
 ```
+
+### Dependencies
+
+| File                    | Purpose                                      |
+|-------------------------|----------------------------------------------|
+| `requirements.txt`      | Production deps — Render installs only this. |
+| `requirements-dev.txt`  | Adds pytest + Playwright for local/CI e2e.   |
+| `.python-version`       | Pins Render to Python 3.11.0.                |
 
 ## API
 

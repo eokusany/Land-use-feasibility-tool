@@ -1,0 +1,8 @@
+# Dev / test-only dependencies. NOT installed in production.
+# Production deploys (Render) install requirements.txt only.
+
+-r requirements.txt
+
+pytest==8.3.4
+pytest-playwright==0.6.2
+playwright==1.49.1
