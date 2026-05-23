@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Tuple
 
 from geopy.distance import geodesic
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut
-from geopy.geocoders import Nominatim
+from geopy.geocoders import Nominatim, Photon
 
 from canada_municipalities import CANADIAN_MUNICIPALITIES
 
@@ -68,16 +68,25 @@ class PropertyParser:
     """Parse property information from various input formats (all of Canada)."""
 
     def __init__(self):
-        # Nominatim ToS asks for a contact email in the User-Agent. Use the
-        # configured one if available, else a generic but identifiable string.
-        ua_contact = os.environ.get(
-            "CANLAND_NOMINATIM_CONTACT",
-            "canland@example.com",
+        ua_contact = os.environ.get("CANLAND_NOMINATIM_CONTACT", "").strip()
+        user_agent = (
+            f"plotline_feasibility_tool/1.2 ({ua_contact})"
+            if ua_contact
+            else "plotline_feasibility_tool/1.2"
         )
-        self.geolocator = Nominatim(
-            user_agent=f"canland_feasibility_tool/1.1 ({ua_contact})",
-            timeout=10,
-        )
+
+        # Photon (by Komoot) is the primary geocoder. It uses OSM data, has
+        # no UA enforcement, and is friendlier to server-side use than
+        # Nominatim — which started 403'ing Render's shared IP after a few
+        # requests. We keep Nominatim as a fallback so we have two chances
+        # to resolve any given address.
+        self._geocoders = [
+            ("photon", Photon(user_agent=user_agent, timeout=10)),
+            ("nominatim", Nominatim(user_agent=user_agent, timeout=10)),
+        ]
+        # Backwards-compatible alias; some legacy callers / tests may reach
+        # in for `self.geolocator`.
+        self.geolocator = self._geocoders[0][1]
 
         # Legal description patterns (primarily western Canada DLS, also lot/block plan)
         self.legal_patterns = {
@@ -278,24 +287,43 @@ class PropertyParser:
         return parsed
 
     def _geocode_address(self, address: str, province: str = "") -> Optional[Dict]:
-        # Throttle to honour Nominatim's 1 req/sec ToS — sharing a single
-        # public endpoint with thousands of other users, this matters.
-        _throttle_nominatim()
-        try:
-            # Append province name and country for better accuracy
-            suffix = ""
-            if province and province.upper() in self._province_suffixes:
-                suffix = f", {self._province_suffixes[province.upper()]}"
-            full_address = f"{address}{suffix}, Canada"
-            location = self.geolocator.geocode(full_address, country_codes="ca")
+        # Build the canonical query string once and try each geocoder in
+        # turn until one succeeds. Photon is tried first; Nominatim is the
+        # fallback for addresses Photon can't resolve.
+        suffix = ""
+        if province and province.upper() in self._province_suffixes:
+            suffix = f", {self._province_suffixes[province.upper()]}"
+        full_address = f"{address}{suffix}, Canada"
+
+        for name, geocoder in self._geocoders:
+            # Nominatim's ToS asks for 1 req/sec from a single host. Photon
+            # has no such limit, but we throttle Nominatim specifically.
+            if name == "nominatim":
+                _throttle_nominatim()
+            try:
+                location = geocoder.geocode(full_address)
+            except (GeocoderTimedOut, GeocoderServiceError) as exc:
+                logger.warning(
+                    "Geocoding via %s failed for %r: %s", name, address, exc
+                )
+                continue
+            except Exception as exc:  # noqa: BLE001 — defensive
+                logger.warning(
+                    "Geocoding via %s raised unexpected error for %r: %s",
+                    name, address, exc,
+                )
+                continue
             if location:
+                logger.info(
+                    "Geocoded %r via %s -> (%.5f, %.5f)",
+                    address, name, location.latitude, location.longitude,
+                )
                 return {
                     "latitude": location.latitude,
                     "longitude": location.longitude,
                     "display_name": location.address,
+                    "source": name,
                 }
-        except (GeocoderTimedOut, GeocoderServiceError) as exc:
-            logger.warning("Geocoding failed for %r: %s", address, exc)
         return None
 
     def _extract_municipality_hints(self, text: str) -> List[str]:

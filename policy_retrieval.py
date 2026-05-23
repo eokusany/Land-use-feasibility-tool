@@ -1,5 +1,5 @@
 """
-Policy retrieval for CanLand.
+Policy retrieval for Plotline.
 
 IMPORTANT — Honest preliminary mode (Option A):
 
@@ -240,7 +240,7 @@ class PolicyRetrieval:
                 "municipality before relying on this report."
             )
             return
-        except Exception as exc:  # noqa: BLE001 — defensive: never let a provider crash CanLand
+        except Exception as exc:  # noqa: BLE001 — defensive: never let a provider crash Plotline
             self._log_provider_call(provider, "provider_failed", t0, error=str(exc), unexpected=True)
             policy_info["verification_status"] = "provider_failed"
             policy_info["verification_message"] = (
@@ -340,7 +340,7 @@ class PolicyRetrieval:
             "cottage_potential": {},
             "regulatory_considerations": [
                 "Cottage / tourist accommodation feasibility depends on the specific zone designation, "
-                "which CanLand has not retrieved.",
+                "which Plotline has not retrieved.",
                 "Most rural and agricultural zones in Canada do not permit cottage rentals as of right; "
                 "rezoning or a discretionary use approval may be required.",
                 "Servicing constraints (water, septic, fire access) typically drive feasibility more than "

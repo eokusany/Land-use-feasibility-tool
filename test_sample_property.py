@@ -1,4 +1,4 @@
-"""End-to-end smoke test of the CanLand pipeline (offline).
+"""End-to-end smoke test of the Plotline pipeline (offline).
 
 Exercises property_parser -> municipality_lookup -> policy_retrieval against
 the sample cottage-development email referenced in the README. The geocode

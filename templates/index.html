@@ -543,7 +543,7 @@
 
 <noscript>
   <div style="background:#fde8e8;border-left:4px solid #d52b1e;padding:1rem 1.25rem;margin:1rem;border-radius:8px;color:#7a1a1a">
-    <strong>JavaScript is required.</strong> CanLand uses JavaScript to query the
+    <strong>JavaScript is required.</strong> Plotline uses JavaScript to query the
     municipal lookup APIs and render results. Please enable JavaScript in your
     browser to use this tool.
   </div>
@@ -815,7 +815,7 @@
           <p class="text-muted small mb-2">Recommended verification and due-diligence steps:</p>
           <ol class="action-list" id="resActionsList"></ol>
           <div class="mt-3 p-3 rounded-3" style="background:#fffbe6; border:1px solid #ffe58f; font-size:.85rem">
-            <strong>Disclaimer:</strong> This is a preliminary reference report. CanLand does not retrieve parcel-level zoning.
+            <strong>Disclaimer:</strong> This is a preliminary reference report. Plotline does not retrieve parcel-level zoning.
             Always verify with the municipal planning department before making any development decision.
           </div>
         </div>
@@ -960,7 +960,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ================================================================
-   CanLand — Frontend Logic
+   Plotline — Frontend Logic
 ================================================================ */
 
 // State
@@ -1205,7 +1205,7 @@ function renderResults(data) {
     bannerEl.innerHTML = `
       <strong><i class="fas fa-circle-check me-1" style="color:#2e7d32"></i>Zone verified.</strong>
       The base zone for this parcel was retrieved from ${escapeHtml(policy.zone_source || 'the city open data')}.
-      Setbacks, height limits, density, and permitted uses are <strong>not</strong> extracted from bylaw text by CanLand —
+      Setbacks, height limits, density, and permitted uses are <strong>not</strong> extracted from bylaw text by Plotline —
       open the linked bylaw section below for the authoritative rules. Site-specific amendments and discretionary
       variances are not in the open dataset; confirm with the municipality before making development decisions.
     `;
@@ -1214,7 +1214,7 @@ function renderResults(data) {
     bannerEl.style.border = '1px solid #ffb74d';
     bannerEl.innerHTML = `
       <strong><i class="fas fa-triangle-exclamation me-1" style="color:#e65100"></i>Verification required.</strong>
-      CanLand identifies the municipality and provides links to the land use bylaw and planning department.
+      Plotline identifies the municipality and provides links to the land use bylaw and planning department.
       It does <strong>not</strong> retrieve parcel-level zoning for this municipality. The specific zone, permitted uses,
       setbacks, height, and density for this address must be confirmed directly with the municipality.
     `;
@@ -1427,7 +1427,7 @@ document.getElementById('downloadReportBtn').addEventListener('click', async () 
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `CanLand_Report_${Date.now()}.pdf`;
+    a.download = `Plotline_Report_${Date.now()}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

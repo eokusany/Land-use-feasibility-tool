@@ -1,4 +1,4 @@
-"""CanLand Flask application — entrypoint and HTTP routes."""
+"""Plotline Flask application — entrypoint and HTTP routes."""
 
 import logging
 import os
@@ -259,7 +259,7 @@ def _generate_feasibility_summary(policy_info: dict) -> dict:
 
         key_considerations = [
             f"Parcel zone: {zone} (verified from {source}).",
-            "CanLand does not extract setbacks, height limits, density, or permitted uses from bylaw text. "
+            "Plotline does not extract setbacks, height limits, density, or permitted uses from bylaw text. "
             "Open the linked bylaw section for the authoritative rules.",
         ]
         if overlays:

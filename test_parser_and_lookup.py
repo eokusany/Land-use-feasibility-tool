@@ -210,6 +210,69 @@ class GeocodeBoundaryTests(unittest.TestCase):
         self.assertEqual(dist, 0.0)
 
 
+class GeocoderFallbackTests(unittest.TestCase):
+    """Photon is the primary geocoder; Nominatim is the fallback. When Photon
+    fails (timeout / 403 / network), we must transparently fall through to
+    Nominatim before giving up."""
+
+    def setUp(self):
+        from property_parser import PropertyParser
+        self.parser = PropertyParser()
+
+    def test_primary_geocoder_is_photon(self):
+        self.assertEqual(self.parser._geocoders[0][0], "photon")
+        self.assertEqual(self.parser._geocoders[1][0], "nominatim")
+
+    def test_falls_back_to_nominatim_when_photon_fails(self):
+        from geopy.exc import GeocoderServiceError
+        from unittest.mock import MagicMock
+
+        photon = MagicMock()
+        photon.geocode.side_effect = GeocoderServiceError("403 access denied")
+        nominatim = MagicMock()
+        nominatim_loc = MagicMock(
+            latitude=53.5444, longitude=-113.4909, address="fake address"
+        )
+        nominatim.geocode.return_value = nominatim_loc
+        self.parser._geocoders = [("photon", photon), ("nominatim", nominatim)]
+
+        result = self.parser._geocode_address("1 Main St", "AB")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["source"], "nominatim")
+        self.assertAlmostEqual(result["latitude"], 53.5444, places=3)
+        photon.geocode.assert_called_once()
+        nominatim.geocode.assert_called_once()
+
+    def test_uses_photon_when_it_succeeds(self):
+        from unittest.mock import MagicMock
+
+        photon = MagicMock()
+        photon_loc = MagicMock(
+            latitude=51.0453, longitude=-114.0581, address="Calgary downtown"
+        )
+        photon.geocode.return_value = photon_loc
+        nominatim = MagicMock()
+        self.parser._geocoders = [("photon", photon), ("nominatim", nominatim)]
+
+        result = self.parser._geocode_address("downtown Calgary", "AB")
+        self.assertEqual(result["source"], "photon")
+        # Nominatim must NOT be called when Photon already succeeded
+        nominatim.geocode.assert_not_called()
+
+    def test_returns_none_when_all_geocoders_fail(self):
+        from geopy.exc import GeocoderTimedOut
+        from unittest.mock import MagicMock
+
+        photon = MagicMock()
+        photon.geocode.side_effect = GeocoderTimedOut("photon timed out")
+        nominatim = MagicMock()
+        nominatim.geocode.side_effect = GeocoderTimedOut("nominatim timed out")
+        self.parser._geocoders = [("photon", photon), ("nominatim", nominatim)]
+
+        result = self.parser._geocode_address("nowhere real", "")
+        self.assertIsNone(result)
+
+
 class GeocodeBoundaryProviderIntegrationTest(unittest.TestCase):
     """When the geocode lands far from the selected municipality, the provider
     is NOT called at all — we surface outside_coverage immediately."""
