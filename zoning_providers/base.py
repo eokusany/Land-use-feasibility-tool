@@ -85,6 +85,19 @@ class ZoningProvider(ABC):
             unexpected upstream errors.
         """
 
+    def context(self, lat: float, lon: float):
+        """
+        Look up Tier 1 parcel context at the given coordinate.
+
+        Returns a `ParcelContext` (from `zoning_providers.parcel_context`) or
+        None. Default returns None — cities without a parcel-context
+        implementation simply skip the Parcel Context section in the report.
+
+        Subclasses that override MUST NOT raise; per-feature failures should
+        be appended to `ParcelContext.warnings` instead.
+        """
+        return None
+
     # ------------------------------------------------------------------
     # Shared HTTP helper
     # ------------------------------------------------------------------

@@ -101,5 +101,26 @@ class ParcelContextTests(unittest.TestCase):
         self.assertEqual(ctx.to_dict()["warnings"], ["permits API timed out"])
 
 
+from zoning_providers import ZoningProvider
+
+
+class ZoningProviderContextDefaultTests(unittest.TestCase):
+    def test_base_context_returns_none(self):
+        """Providers that don't implement context() return None — the report
+        layer treats this the same as a missing provider for that feature."""
+
+        class _DummyProvider(ZoningProvider):
+            name = "dummy"
+            municipality = "Dummy"
+            province = "ZZ"
+            source = "dummy"
+            source_url = "https://example.invalid"
+
+            def lookup(self, lat, lon):
+                return None
+
+        self.assertIsNone(_DummyProvider().context(0.0, 0.0))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
