@@ -184,6 +184,17 @@ class EdmontonZoningProvider(ZoningProvider):
         self._populate_heritage(ctx, lat, lon)
         self._populate_flood(ctx, lat, lon)
         self._populate_adjacent_zones(ctx, lat, lon)
+        # Dedupe overlay flags by (category, code) — APIs can return multiple
+        # identical polygons (e.g. several Floodplain polygons covering one parcel).
+        seen = set()
+        deduped = []
+        for f in ctx.overlay_flags:
+            key = (f.category, f.code)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(f)
+        ctx.overlay_flags = deduped
         ctx.aerial_image = build_static_aerial(lat=lat, lon=lon)
         if ctx.aerial_image is None:
             ctx.warnings.append("aerial image skipped: PLOTLINE_MAPBOX_TOKEN not set")

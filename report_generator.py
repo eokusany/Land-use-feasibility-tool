@@ -7,6 +7,15 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 import os
 from datetime import datetime
 from typing import Dict, List
+from xml.sax.saxutils import escape as _xml_escape
+
+
+def _esc(value) -> str:
+    """Escape user-controlled strings for ReportLab Paragraph's tiny XML dialect.
+    Returns an empty string for None so callers can pass `dict.get(...)` directly."""
+    if value is None:
+        return ""
+    return _xml_escape(str(value))
 
 class ReportGenerator:
     """Generate PDF reports for land use feasibility studies"""
@@ -396,6 +405,8 @@ class ReportGenerator:
             # --- Verified zone block ---
             story.append(Paragraph("Parcel Zone (Verified)", self.styles['SectionHeader']))
 
+            # Table cells are NOT XML-parsed by ReportLab, so raw strings here
+            # are safe even if they contain '&', '<', '>'.
             zone_table_rows = [
                 ['Zone Code', policy_info.get('zoning_code') or '—'],
                 ['Zone Name', (policy_info.get('zoning') or '').split(' — ', 1)[-1] or '—'],
@@ -417,7 +428,7 @@ class ReportGenerator:
             if section_url:
                 story.append(Paragraph(
                     f'<b>Bylaw section for this zone:</b> '
-                    f'<a href="{section_url}" color="blue">{section_url}</a>',
+                    f'<a href="{_esc(section_url)}" color="blue">{_esc(section_url)}</a>',
                     self.styles['Normal'],
                 ))
                 story.append(Paragraph(
@@ -430,7 +441,7 @@ class ReportGenerator:
 
             # Provider notes (e.g. for DC1/DC2 site-specific zones)
             for note in policy_info.get('zone_provider_notes') or []:
-                story.append(Paragraph(f"<b>Note:</b> {note}", self.styles['Highlight']))
+                story.append(Paragraph(f"<b>Note:</b> {_esc(note)}", self.styles['Highlight']))
                 story.append(Spacer(1, 0.05*inch))
 
             # Overlays
@@ -442,9 +453,9 @@ class ReportGenerator:
                     self.styles['Normal'],
                 ))
                 for o in overlays:
-                    bylaw_no = f" (Bylaw {o['bylaw_no']})" if o.get('bylaw_no') else ""
+                    bylaw_no = f" (Bylaw {_esc(o['bylaw_no'])})" if o.get('bylaw_no') else ""
                     story.append(Paragraph(
-                        f"• <b>{o['code']}</b> — {o['description']}{bylaw_no}",
+                        f"• <b>{_esc(o['code'])}</b> — {_esc(o['description'])}{bylaw_no}",
                         self.styles['Normal'],
                     ))
                 story.append(Spacer(1, 0.1*inch))
@@ -465,12 +476,12 @@ class ReportGenerator:
                 'zoning_status',
                 'Not retrieved. Parcel-level zoning must be verified directly with the municipal planning department.'
             )
-            story.append(Paragraph(f"<b>Status:</b> {zoning_status}", self.styles['Highlight']))
+            story.append(Paragraph(f"<b>Status:</b> {_esc(zoning_status)}", self.styles['Highlight']))
 
             # Surface provider failure messages so the user knows what happened
             verification_message = policy_info.get('verification_message')
             if verification_message:
-                story.append(Paragraph(f"<i>{verification_message}</i>", self.styles['Normal']))
+                story.append(Paragraph(f"<i>{_esc(verification_message)}</i>", self.styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
 
         # Land use bylaw link (always shown when known)
@@ -478,8 +489,8 @@ class ReportGenerator:
         if bylaw.get('url'):
             story.append(Paragraph("Land Use Bylaw", self.styles['SectionHeader']))
             story.append(Paragraph(
-                f"<b>{bylaw.get('title', 'Land Use Bylaw')}:</b> "
-                f'<a href="{bylaw["url"]}" color="blue">{bylaw["url"]}</a>',
+                f"<b>{_esc(bylaw.get('title', 'Land Use Bylaw'))}:</b> "
+                f'<a href="{_esc(bylaw["url"])}" color="blue">{_esc(bylaw["url"])}</a>',
                 self.styles['Normal'],
             ))
             if not is_verified:
@@ -565,7 +576,7 @@ class ReportGenerator:
             story.append(Paragraph("Adjacent Zones", self.styles['SectionHeader']))
             for z in adjacent:
                 story.append(Paragraph(
-                    f"• <b>{z['code']}</b> — {z.get('name', '')} "
+                    f"• <b>{_esc(z['code'])}</b> — {_esc(z.get('name', ''))} "
                     f"<font color='grey'>({z['count']})</font>",
                     self.styles['Normal'],
                 ))
@@ -577,7 +588,7 @@ class ReportGenerator:
             story.append(Paragraph("Overlay &amp; Hazard Flags", self.styles['SectionHeader']))
             for f in overlays:
                 story.append(Paragraph(
-                    f"• [{f['category'].upper()}] <b>{f['code']}</b> — {f['description']}",
+                    f"• [{_esc(f['category'].upper())}] <b>{_esc(f['code'])}</b> — {_esc(f['description'])}",
                     self.styles['Normal'],
                 ))
             story.append(Spacer(1, 0.15 * inch))
@@ -609,7 +620,7 @@ class ReportGenerator:
         warnings = pc.get('warnings') or []
         if warnings:
             story.append(Paragraph(
-                "<i>Notes: " + "; ".join(warnings) + "</i>",
+                "<i>Notes: " + "; ".join(_esc(w) for w in warnings) + "</i>",
                 self.styles['Normal'],
             ))
             story.append(Spacer(1, 0.1 * inch))
