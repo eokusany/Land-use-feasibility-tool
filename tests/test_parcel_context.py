@@ -1,6 +1,8 @@
 """Tests for the parcel context dataclasses."""
 
+import os
 import unittest
+from unittest.mock import patch
 
 from zoning_providers.parcel_context import (
     AdjacentZone,
@@ -120,6 +122,45 @@ class ZoningProviderContextDefaultTests(unittest.TestCase):
                 return None
 
         self.assertIsNone(_DummyProvider().context(0.0, 0.0))
+
+
+from zoning_providers.aerial import build_static_aerial
+
+
+class AerialHelperTests(unittest.TestCase):
+    def test_returns_none_when_token_missing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            img = build_static_aerial(lat=53.5444, lon=-113.4909)
+        self.assertIsNone(img)
+
+    def test_builds_url_when_token_present(self):
+        with patch.dict(os.environ, {"PLOTLINE_MAPBOX_TOKEN": "pk.test"}, clear=True):
+            img = build_static_aerial(lat=53.5444, lon=-113.4909)
+        self.assertIsNotNone(img)
+        self.assertIn("api.mapbox.com", img.url)
+        self.assertIn("53.5444", img.url)
+        self.assertIn("-113.4909", img.url)
+        # Token must be URL-querystring, never embedded path
+        self.assertIn("access_token=pk.test", img.url)
+        self.assertEqual(img.width, 600)
+        self.assertEqual(img.height, 400)
+        self.assertEqual(img.zoom, 18)
+        self.assertIn("Mapbox", img.attribution)
+
+    def test_custom_size_and_zoom_respected(self):
+        with patch.dict(os.environ, {"PLOTLINE_MAPBOX_TOKEN": "pk.test"}, clear=True):
+            img = build_static_aerial(lat=51.0447, lon=-114.0631,
+                                      width=400, height=300, zoom=17)
+        self.assertEqual(img.width, 400)
+        self.assertEqual(img.height, 300)
+        self.assertEqual(img.zoom, 17)
+        self.assertIn("400x300", img.url)
+
+    def test_rejects_oversized_dimensions(self):
+        """Mapbox Static Images max is 1280x1280. Refuse larger."""
+        with patch.dict(os.environ, {"PLOTLINE_MAPBOX_TOKEN": "pk.test"}, clear=True):
+            self.assertIsNone(build_static_aerial(lat=0, lon=0, width=2000, height=400))
+            self.assertIsNone(build_static_aerial(lat=0, lon=0, width=400, height=2000))
 
 
 if __name__ == "__main__":
