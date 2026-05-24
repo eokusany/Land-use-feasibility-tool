@@ -205,6 +205,23 @@ class PolicyRetrievalCalgaryIntegrationTests(unittest.TestCase):
         self.assertEqual(policy["setbacks"], {})
         self.assertEqual(policy["permitted_uses"], [])
 
+    def test_verified_path_includes_parcel_context(self):
+        with patch("zoning_providers.base.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response(ZONE_HIT),       # zone lookup
+                _mock_response([]),             # parcel
+                _mock_response([]),             # permits
+                _mock_response([]),             # heritage
+                _mock_response([]),             # flood
+                _mock_response([]),             # neighbour zones
+            ]
+            policy = self.pr.get_land_use_policies(self.muni, self.prop_with_coords)
+        self.assertIn("parcel_context", policy)
+        pc = policy["parcel_context"]
+        self.assertIsInstance(pc, dict)
+        for key in ("lot", "permits", "adjacent_zones", "overlay_flags", "aerial_image", "warnings"):
+            self.assertIn(key, pc)
+
 
 # ---------------------------------------------------------------------------
 # Live integration test — gated by env var

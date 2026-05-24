@@ -1,0 +1,118 @@
+[
+    {
+        "lu_code": "DC",
+        "label": "DC28D2013",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC87D2008",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC53Z95"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC69D2008",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC47D2013",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "CC-MH",
+        "label": "CC-MH",
+        "description": "Centre City Multi-Residential High Rise District",
+        "major": "Residential - High Density",
+        "generalize": "Multi-Residential"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC26D2022",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC34D2019",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "S-CRI",
+        "label": "S-CRI",
+        "description": "Special Purpose - City and Regional Infrastructure",
+        "major": "Major Infrastructure",
+        "generalize": "City Regional Infrastructure"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC311D2016",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC86D2008",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC255D2018SITE2",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC72Z84",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC120D2025",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC5D2014SITE1",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC93D2020",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    },
+    {
+        "lu_code": "DC",
+        "label": "DC67D2013",
+        "description": "Direct Control",
+        "major": "Direct Control",
+        "generalize": "Direct Control"
+    }
+]

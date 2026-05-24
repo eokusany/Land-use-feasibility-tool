@@ -7,6 +7,15 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 import os
 from datetime import datetime
 from typing import Dict, List
+from xml.sax.saxutils import escape as _xml_escape
+
+
+def _esc(value) -> str:
+    """Escape user-controlled strings for ReportLab Paragraph's tiny XML dialect.
+    Returns an empty string for None so callers can pass `dict.get(...)` directly."""
+    if value is None:
+        return ""
+    return _xml_escape(str(value))
 
 class ReportGenerator:
     """Generate PDF reports for land use feasibility studies"""
@@ -107,7 +116,10 @@ class ReportGenerator:
         
         # Zoning and policy analysis
         story.extend(self._create_policy_section(analysis_data))
-        
+
+        # Tier 1 — parcel context (lot, adjacent zones, permits, overlays)
+        story.extend(self._create_parcel_context_section(analysis_data))
+
         # Development analysis (if cottage development data available)
         if 'cottage_analysis' in analysis_data:
             story.extend(self._create_development_analysis(analysis_data))
@@ -393,6 +405,8 @@ class ReportGenerator:
             # --- Verified zone block ---
             story.append(Paragraph("Parcel Zone (Verified)", self.styles['SectionHeader']))
 
+            # Table cells are NOT XML-parsed by ReportLab, so raw strings here
+            # are safe even if they contain '&', '<', '>'.
             zone_table_rows = [
                 ['Zone Code', policy_info.get('zoning_code') or '—'],
                 ['Zone Name', (policy_info.get('zoning') or '').split(' — ', 1)[-1] or '—'],
@@ -414,7 +428,7 @@ class ReportGenerator:
             if section_url:
                 story.append(Paragraph(
                     f'<b>Bylaw section for this zone:</b> '
-                    f'<a href="{section_url}" color="blue">{section_url}</a>',
+                    f'<a href="{_esc(section_url)}" color="blue">{_esc(section_url)}</a>',
                     self.styles['Normal'],
                 ))
                 story.append(Paragraph(
@@ -427,7 +441,7 @@ class ReportGenerator:
 
             # Provider notes (e.g. for DC1/DC2 site-specific zones)
             for note in policy_info.get('zone_provider_notes') or []:
-                story.append(Paragraph(f"<b>Note:</b> {note}", self.styles['Highlight']))
+                story.append(Paragraph(f"<b>Note:</b> {_esc(note)}", self.styles['Highlight']))
                 story.append(Spacer(1, 0.05*inch))
 
             # Overlays
@@ -439,9 +453,9 @@ class ReportGenerator:
                     self.styles['Normal'],
                 ))
                 for o in overlays:
-                    bylaw_no = f" (Bylaw {o['bylaw_no']})" if o.get('bylaw_no') else ""
+                    bylaw_no = f" (Bylaw {_esc(o['bylaw_no'])})" if o.get('bylaw_no') else ""
                     story.append(Paragraph(
-                        f"• <b>{o['code']}</b> — {o['description']}{bylaw_no}",
+                        f"• <b>{_esc(o['code'])}</b> — {_esc(o['description'])}{bylaw_no}",
                         self.styles['Normal'],
                     ))
                 story.append(Spacer(1, 0.1*inch))
@@ -462,12 +476,12 @@ class ReportGenerator:
                 'zoning_status',
                 'Not retrieved. Parcel-level zoning must be verified directly with the municipal planning department.'
             )
-            story.append(Paragraph(f"<b>Status:</b> {zoning_status}", self.styles['Highlight']))
+            story.append(Paragraph(f"<b>Status:</b> {_esc(zoning_status)}", self.styles['Highlight']))
 
             # Surface provider failure messages so the user knows what happened
             verification_message = policy_info.get('verification_message')
             if verification_message:
-                story.append(Paragraph(f"<i>{verification_message}</i>", self.styles['Normal']))
+                story.append(Paragraph(f"<i>{_esc(verification_message)}</i>", self.styles['Normal']))
             story.append(Spacer(1, 0.1*inch))
 
         # Land use bylaw link (always shown when known)
@@ -475,8 +489,8 @@ class ReportGenerator:
         if bylaw.get('url'):
             story.append(Paragraph("Land Use Bylaw", self.styles['SectionHeader']))
             story.append(Paragraph(
-                f"<b>{bylaw.get('title', 'Land Use Bylaw')}:</b> "
-                f'<a href="{bylaw["url"]}" color="blue">{bylaw["url"]}</a>',
+                f"<b>{_esc(bylaw.get('title', 'Land Use Bylaw'))}:</b> "
+                f'<a href="{_esc(bylaw["url"])}" color="blue">{_esc(bylaw["url"])}</a>',
                 self.styles['Normal'],
             ))
             if not is_verified:
@@ -509,7 +523,110 @@ class ReportGenerator:
             story.append(Spacer(1, 0.1*inch))
 
         return story
-    
+
+    def _create_parcel_context_section(self, data: Dict) -> List:
+        """Tier 1 parcel context — lot, permits, adjacent zones, overlays.
+        Aerial image URL is captured in policy_info but not embedded in the
+        PDF (image fetching is out of scope for Tier 1)."""
+        story = []
+        policy_info = data.get('policy_info', {}) or {}
+        pc = policy_info.get('parcel_context') or {}
+
+        # Skip the whole section when nothing was populated (e.g. unverified
+        # city, or all features returned empty).
+        has_content = bool(
+            pc.get('lot') or pc.get('permits') or pc.get('adjacent_zones')
+            or pc.get('overlay_flags')
+        )
+        if not has_content:
+            return story
+
+        story.append(Paragraph("Parcel Context", self.styles['Subtitle']))
+        story.append(Spacer(1, 0.2 * inch))
+
+        # --- Lot ---
+        lot = pc.get('lot')
+        if lot:
+            story.append(Paragraph("Lot Characteristics", self.styles['SectionHeader']))
+            rows = [
+                ['Area', f"{lot.get('area_m2'):.0f} m²" if lot.get('area_m2') is not None else '—'],
+                ['Frontage', f"{lot.get('frontage_m'):.1f} m" if lot.get('frontage_m') is not None else '—'],
+                ['Depth', f"{lot.get('depth_m'):.1f} m" if lot.get('depth_m') is not None else '—'],
+                ['Source', lot.get('source') or '—'],
+            ]
+            t = Table(rows, colWidths=[1.6 * inch, 4.4 * inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('FONTNAME',   (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('VALIGN',     (0, 0), (-1, -1), 'TOP'),
+                ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(t)
+            story.append(Paragraph(
+                "<i>Frontage and depth are not exposed by the Edmonton or Calgary "
+                "open-data parcel datasets today. Confirm dimensions against the "
+                "registered plan of survey for the lot.</i>",
+                self.styles['Normal'],
+            ))
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Adjacent zones ---
+        adjacent = pc.get('adjacent_zones') or []
+        if adjacent:
+            story.append(Paragraph("Adjacent Zones", self.styles['SectionHeader']))
+            for z in adjacent:
+                story.append(Paragraph(
+                    f"• <b>{_esc(z['code'])}</b> — {_esc(z.get('name', ''))} "
+                    f"<font color='grey'>({z['count']})</font>",
+                    self.styles['Normal'],
+                ))
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Overlay flags ---
+        overlays = pc.get('overlay_flags') or []
+        if overlays:
+            story.append(Paragraph("Overlay &amp; Hazard Flags", self.styles['SectionHeader']))
+            for f in overlays:
+                story.append(Paragraph(
+                    f"• [{_esc(f['category'].upper())}] <b>{_esc(f['code'])}</b> — {_esc(f['description'])}",
+                    self.styles['Normal'],
+                ))
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Permits ---
+        permits = pc.get('permits') or []
+        if permits:
+            story.append(Paragraph("Open &amp; Recent Permits (last 5 years)", self.styles['SectionHeader']))
+            rows = [['Number', 'Date', 'Status', 'Type']]
+            for p in permits:
+                rows.append([
+                    p.get('permit_number') or '—',
+                    p.get('issue_date') or '—',
+                    p.get('status') or '—',
+                    p.get('work_type') or '—',
+                ])
+            t = Table(rows, colWidths=[1.4 * inch, 1.1 * inch, 1.2 * inch, 2.3 * inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('GRID',       (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN',     (0, 0), (-1, -1), 'TOP'),
+                ('FONTSIZE',   (0, 0), (-1, -1), 8),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Warnings (kept terse, footnote-style) ---
+        warnings = pc.get('warnings') or []
+        if warnings:
+            story.append(Paragraph(
+                "<i>Notes: " + "; ".join(_esc(w) for w in warnings) + "</i>",
+                self.styles['Normal'],
+            ))
+            story.append(Spacer(1, 0.1 * inch))
+
+        return story
+
     def _create_development_analysis(self, data: Dict) -> List:
         """Create development analysis section"""
         story = []

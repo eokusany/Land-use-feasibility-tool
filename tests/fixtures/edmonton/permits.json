@@ -1,0 +1,489 @@
+[
+    {
+        "city_file_number": "630455077-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Not Available",
+        "permit_date": "2026-05-21T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To establish a Comprehensive Sign Design Plan for (STATION LANDS)",
+        "address": "10423 - 101 STREET NW",
+        "legal_description": "Plan 2321876 Blk A Lot 1",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.54770176864062",
+        "longitude": "-113.4921198640895",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.4921198640895,
+                53.54770176864062
+            ]
+        }
+    },
+    {
+        "city_file_number": "650285389-002",
+        "permit_type": "Major Development Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-05-14T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To construct/place on site two modular shipping containers to a Community Service and Indoor Sales and Service development (QUARTERS ARTS SOCIETY).",
+        "address": "9641 - 102A AVENUE NW",
+        "legal_description": "Plan ND Blk 6 Lots 16-18",
+        "neighbourhood_id": "1020",
+        "neighbourhood": "BOYLE STREET",
+        "neighbourhood_classification": "Redeveloping",
+        "ward": "O-day'min Ward",
+        "zoning": "MU",
+        "land_parcel_count": "3",
+        "latitude": "53.54495390182933",
+        "longitude": "-113.48475703963629",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.48475703963629,
+                53.54495390182933
+            ]
+        }
+    },
+    {
+        "city_file_number": "656415121-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-05-14T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (1) Fascia Sign limited to On-premises Advertising (ref CSDP: 510468496-033 Type 3) (CIBC)",
+        "address": "1610, 10180 - 101 STREET NW",
+        "legal_description": "Plan 8121364 Blk 1 Lot A",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.542625862577296",
+        "longitude": "-113.49461903290356",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49461903290356,
+                53.542625862577296
+            ]
+        }
+    },
+    {
+        "city_file_number": "655030828-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-04-27T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (1) Fascia Sign limited to On-premises Advertising (WILLIAMS HALL)",
+        "address": "10030 - 102A AVENUE NW",
+        "legal_description": "Plan F Lots 77-78",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.54464803295585",
+        "longitude": "-113.49276206450078",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49276206450078,
+                53.54464803295585
+            ]
+        }
+    },
+    {
+        "city_file_number": "652778752-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-04-14T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (3) Fascia Signs limited to On-premises Advertising (RICE HOWARD PLACE)",
+        "address": "100, 10060 - JASPER AVENUE NW",
+        "legal_description": "Plan 8221723 Lot C",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.541364072909204",
+        "longitude": "-113.49260364221824",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49260364221824,
+                53.541364072909204
+            ]
+        }
+    },
+    {
+        "city_file_number": "653192582-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-04-09T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (2) Fascia Signs limited to On-premises Advertising (CSDP 510468496-033 | N-01, E-06) (National Bank).",
+        "address": "100, 10180 - 101 STREET NW",
+        "legal_description": "Plan 8121364 Blk 1 Lot A",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.542625862577296",
+        "longitude": "-113.49461903290356",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49461903290356,
+                53.542625862577296
+            ]
+        }
+    },
+    {
+        "city_file_number": "643723438-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-03-30T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (4) Fascia Signs limited to On-premises Advertising, and (2) Projecting Signs not in the form of a Roof Sign limited to On-premises Advertising (CSDP 510468496-033 | E-03, E-04, N-03, W-04, W-10, W-11) (National Bank Centre).",
+        "address": "10180 - 101 STREET NW",
+        "legal_description": "Plan 8121364 Blk 1 Lot A",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.542625862577296",
+        "longitude": "-113.49461903290356",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49461903290356,
+                53.542625862577296
+            ]
+        }
+    },
+    {
+        "city_file_number": "651039231-002",
+        "permit_type": "Major Development Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-03-25T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To Construct Exterior Alterations to a Spectator Sports Establishment (Replace Window Glazing Wall with Overhead Door)",
+        "address": "10255 - 104 AVENUE NW",
+        "legal_description": "Plan 1620220 Blk 2 Lot 3",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "neighbourhood_classification": "Redeveloping",
+        "ward": "O-day'min Ward",
+        "zoning": "AED",
+        "land_parcel_count": "3",
+        "latitude": "53.54590286961555",
+        "longitude": "-113.49691337758094",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49691337758094,
+                53.54590286961555
+            ]
+        }
+    },
+    {
+        "city_file_number": "647953912-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-03-11T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (3) Projecting Signs not in the form of a Roof Sign limited to On-premises Advertising (RICE HOWARD PLACE)",
+        "address": "100, 10060 - JASPER AVENUE NW",
+        "legal_description": "Plan 8221723 Lot C",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "9",
+        "latitude": "53.54134551474187",
+        "longitude": "-113.49281997315802",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49281997315802,
+                53.54134551474187
+            ]
+        }
+    },
+    {
+        "city_file_number": "643689526-002",
+        "permit_type": "Major Development Permit",
+        "permit_class": "Discretionary Development",
+        "permit_date": "2026-03-04T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To construct a Food and Drink Service building, operate Special Events and Accessory Outdoor Recreation Service, and develop a Surface Parking Lot with public art in the north east corner, valid for 5 years.",
+        "address": "10199 - 101 STREET NW",
+        "legal_description": "Plan F Lots 43-46",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "neighbourhood_classification": "Redeveloping",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.542892203535615",
+        "longitude": "-113.49305464732063",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49305464732063,
+                53.542892203535615
+            ]
+        }
+    },
+    {
+        "city_file_number": "645861424-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-02-26T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (1) Fascia Sign limited to On-premises Advertising (RICE HOWARD PLACE | multi tenant).",
+        "address": "100, 10060 - JASPER AVENUE NW",
+        "legal_description": "Plan 8221723 Lot C",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.541364072909204",
+        "longitude": "-113.49260364221824",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49260364221824,
+                53.541364072909204
+            ]
+        }
+    },
+    {
+        "city_file_number": "634464514-002",
+        "permit_type": "Major Development Permit",
+        "permit_class": "Discretionary Development",
+        "permit_date": "2026-02-25T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To convert an Office building to Residential Use (344 Dwellings of Multi-unit Housing), and to construct exterior alterations (window changes, and new rooftop mechanical penthouse).  The existing main floor non-Residential Uses will remain.",
+        "address": "10004 - 104 AVENUE NW",
+        "legal_description": "Plan 9524494 Lot 2",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "neighbourhood_classification": "Redeveloping",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.54702692755079",
+        "longitude": "-113.49136102450944",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49136102450944,
+                53.54702692755079
+            ]
+        }
+    },
+    {
+        "city_file_number": "647566235-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-02-25T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (2) Fascia Signs limited to On-premises Advertising (Ref CSDP: 18326385-001) (TD INSURANCE)",
+        "address": "2300, 10025 - 102A AVENUE NW",
+        "legal_description": "Plan 1194TR Lot A",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.54376395787369",
+        "longitude": "-113.4927317417713",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.4927317417713,
+                53.54376395787369
+            ]
+        }
+    },
+    {
+        "city_file_number": "641558710-002",
+        "permit_type": "Major Development Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-01-27T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To Change the Use from Offices to a Child Care Service (133 Children) and to Construct Exterior Alterations (Outdoor Playground)",
+        "address": "10177 - 97 STREET NW",
+        "legal_description": "Plan 0921522 Blk 3 Lot 25A",
+        "neighbourhood_id": "1020",
+        "neighbourhood": "BOYLE STREET",
+        "neighbourhood_classification": "Redeveloping",
+        "ward": "O-day'min Ward",
+        "zoning": "MU",
+        "land_parcel_count": "3",
+        "latitude": "53.5436563258089",
+        "longitude": "-113.48558767736496",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.48558767736496,
+                53.5436563258089
+            ]
+        }
+    },
+    {
+        "city_file_number": "510468496-033",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-01-26T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To revise a Comprehensive Sign Design Plan for (510468496-006)(Manulife Place).",
+        "address": "10180 - 101 STREET NW",
+        "legal_description": "Plan 8121364 Blk 1 Lot A",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.542625862577296",
+        "longitude": "-113.49461903290356",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49461903290356,
+                53.542625862577296
+            ]
+        }
+    },
+    {
+        "city_file_number": "644038320-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-01-26T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (2) Fascia Signs limited to On-premises Advertising (SUYA CITY | SIMPLY CHOPS CAFE)",
+        "address": "9671 - 102A AVENUE NW",
+        "legal_description": "Plan ND Blk 6 Lots 24-27",
+        "neighbourhood_id": "1020",
+        "neighbourhood": "BOYLE STREET",
+        "ward": "O-day'min Ward",
+        "zoning": "MU",
+        "land_parcel_count": "3",
+        "latitude": "53.544718611648356",
+        "longitude": "-113.4860517019907",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.4860517019907,
+                53.544718611648356
+            ]
+        }
+    },
+    {
+        "city_file_number": "625865600-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-01-23T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To install (1) Projecting Sign not in the form of a Roof Sign limited to On-premises Advertising (Ref CSDP: 632413671-002 #SCU) (SERVUS CREDIT UNION)",
+        "address": "10214 - 104 AVENUE NW",
+        "legal_description": "Plan 1721523 Blk 9E Lot 9",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "AED",
+        "land_parcel_count": "6",
+        "latitude": "53.54683450282287",
+        "longitude": "-113.49639978350031",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49639978350031,
+                53.54683450282287
+            ]
+        }
+    },
+    {
+        "city_file_number": "641479331-002",
+        "permit_type": "Major Development Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-01-22T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To construct exterior alterations to an Office building (City Hall), including gate enclosures.",
+        "address": "1 - SIR WINSTON CHURCHILL SQUARE NW",
+        "legal_description": "Plan 4390NY Blk C",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "neighbourhood_classification": "Redeveloping",
+        "ward": "O-day'min Ward",
+        "zoning": "CCA",
+        "land_parcel_count": "3",
+        "latitude": "53.54535719637539",
+        "longitude": "-113.49017886461164",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49017886461164,
+                53.54535719637539
+            ]
+        }
+    },
+    {
+        "city_file_number": "632413671-002",
+        "permit_type": "Sign Permit",
+        "permit_class": "Permitted Development",
+        "permit_date": "2026-01-21T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To amend Comprehensive Sign Design Plan CSDP: 161157061-001 for (ICE DISTRICT - BLOCK K)",
+        "address": "10214 - 104 AVENUE NW",
+        "legal_description": "Plan 1721523 Blk 9E Lot 9",
+        "neighbourhood_id": "1090",
+        "neighbourhood": "DOWNTOWN",
+        "ward": "O-day'min Ward",
+        "zoning": "AED",
+        "land_parcel_count": "3",
+        "latitude": "53.5467759862661",
+        "longitude": "-113.49608611219801",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.49608611219801,
+                53.5467759862661
+            ]
+        }
+    },
+    {
+        "city_file_number": "634788844-002",
+        "permit_type": "Major Development Permit",
+        "permit_class": "Discretionary Development",
+        "permit_date": "2026-01-08T00:00:00.000",
+        "status": "Approved",
+        "description_of_development": "To construct interior and exterior alterations to an Office building.",
+        "address": "MNFL, 9676 - JASPER AVENUE NW",
+        "legal_description": "Plan ND Blk 2 Lot 33",
+        "neighbourhood_id": "1020",
+        "neighbourhood": "BOYLE STREET",
+        "neighbourhood_classification": "Redeveloping",
+        "ward": "O-day'min Ward",
+        "zoning": "MU",
+        "land_parcel_count": "3",
+        "latitude": "53.54276448963673",
+        "longitude": "-113.4846186674676",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -113.4846186674676,
+                53.54276448963673
+            ]
+        }
+    }
+]

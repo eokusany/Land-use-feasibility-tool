@@ -1,0 +1,167 @@
+"""Tests for the parcel context dataclasses."""
+
+import os
+import unittest
+from unittest.mock import patch
+
+from zoning_providers.parcel_context import (
+    AdjacentZone,
+    AerialImage,
+    LotCharacteristics,
+    OverlayFlag,
+    ParcelContext,
+    PermitRecord,
+)
+
+
+class LotCharacteristicsTests(unittest.TestCase):
+    def test_to_dict_emits_metric_units(self):
+        lot = LotCharacteristics(
+            area_m2=465.3,
+            frontage_m=12.2,
+            depth_m=38.1,
+            orientation_deg=92.0,
+            source="City of Edmonton Property Information",
+            source_url="https://data.edmonton.ca/resource/<id>",
+        )
+        d = lot.to_dict()
+        self.assertEqual(d["area_m2"], 465.3)
+        self.assertEqual(d["frontage_m"], 12.2)
+        self.assertEqual(d["depth_m"], 38.1)
+        self.assertEqual(d["orientation_deg"], 92.0)
+        self.assertIn("Edmonton", d["source"])
+
+
+class AdjacentZoneTests(unittest.TestCase):
+    def test_aggregates_count_and_description(self):
+        adj = AdjacentZone(code="R-G", name="Residential — Grade-Oriented Infill", count=3)
+        d = adj.to_dict()
+        self.assertEqual(d["code"], "R-G")
+        self.assertEqual(d["count"], 3)
+
+
+class PermitRecordTests(unittest.TestCase):
+    def test_serialises_iso_dates(self):
+        p = PermitRecord(
+            permit_number="DP-2024-0042",
+            issue_date="2024-08-12",
+            status="Released",
+            work_type="New Building",
+            description="Construct a triplex",
+            source="City of Edmonton Development Permits",
+            source_url="https://data.edmonton.ca/...",
+        )
+        self.assertEqual(p.to_dict()["issue_date"], "2024-08-12")
+
+
+class OverlayFlagTests(unittest.TestCase):
+    def test_categories_are_explicit(self):
+        flag = OverlayFlag(
+            category="heritage",
+            code="HD-Macdonald",
+            description="Designated heritage resource",
+            source="City of Edmonton Designated Historic Resources",
+            source_url="https://...",
+        )
+        d = flag.to_dict()
+        self.assertEqual(d["category"], "heritage")
+        self.assertEqual(d["code"], "HD-Macdonald")
+
+    def test_rejects_unknown_category(self):
+        with self.assertRaises(ValueError):
+            OverlayFlag(category="bogus", code="x", description="y",
+                        source="s", source_url="u")
+
+
+class AerialImageTests(unittest.TestCase):
+    def test_url_and_attribution_present(self):
+        img = AerialImage(
+            url="https://api.mapbox.com/styles/v1/...",
+            width=600,
+            height=400,
+            zoom=18,
+            attribution="© Mapbox © OpenStreetMap",
+        )
+        self.assertEqual(img.to_dict()["url"], img.url)
+        self.assertIn("Mapbox", img.attribution)
+
+
+class ParcelContextTests(unittest.TestCase):
+    def test_empty_context_serialises_to_nones_and_empty_lists(self):
+        ctx = ParcelContext()
+        d = ctx.to_dict()
+        self.assertIsNone(d["lot"])
+        self.assertEqual(d["adjacent_zones"], [])
+        self.assertEqual(d["permits"], [])
+        self.assertEqual(d["overlay_flags"], [])
+        self.assertIsNone(d["aerial_image"])
+        self.assertEqual(d["warnings"], [])
+
+    def test_warnings_aggregate(self):
+        ctx = ParcelContext()
+        ctx.warnings.append("permits API timed out")
+        self.assertEqual(ctx.to_dict()["warnings"], ["permits API timed out"])
+
+
+from zoning_providers import ZoningProvider
+
+
+class ZoningProviderContextDefaultTests(unittest.TestCase):
+    def test_base_context_returns_none(self):
+        """Providers that don't implement context() return None — the report
+        layer treats this the same as a missing provider for that feature."""
+
+        class _DummyProvider(ZoningProvider):
+            name = "dummy"
+            municipality = "Dummy"
+            province = "ZZ"
+            source = "dummy"
+            source_url = "https://example.invalid"
+
+            def lookup(self, lat, lon):
+                return None
+
+        self.assertIsNone(_DummyProvider().context(0.0, 0.0))
+
+
+from zoning_providers.aerial import build_static_aerial
+
+
+class AerialHelperTests(unittest.TestCase):
+    def test_returns_none_when_token_missing(self):
+        with patch.dict(os.environ, {}, clear=True):
+            img = build_static_aerial(lat=53.5444, lon=-113.4909)
+        self.assertIsNone(img)
+
+    def test_builds_url_when_token_present(self):
+        with patch.dict(os.environ, {"PLOTLINE_MAPBOX_TOKEN": "pk.test"}, clear=True):
+            img = build_static_aerial(lat=53.5444, lon=-113.4909)
+        self.assertIsNotNone(img)
+        self.assertIn("api.mapbox.com", img.url)
+        self.assertIn("53.5444", img.url)
+        self.assertIn("-113.4909", img.url)
+        # Token must be URL-querystring, never embedded path
+        self.assertIn("access_token=pk.test", img.url)
+        self.assertEqual(img.width, 600)
+        self.assertEqual(img.height, 400)
+        self.assertEqual(img.zoom, 18)
+        self.assertIn("Mapbox", img.attribution)
+
+    def test_custom_size_and_zoom_respected(self):
+        with patch.dict(os.environ, {"PLOTLINE_MAPBOX_TOKEN": "pk.test"}, clear=True):
+            img = build_static_aerial(lat=51.0447, lon=-114.0631,
+                                      width=400, height=300, zoom=17)
+        self.assertEqual(img.width, 400)
+        self.assertEqual(img.height, 300)
+        self.assertEqual(img.zoom, 17)
+        self.assertIn("400x300", img.url)
+
+    def test_rejects_oversized_dimensions(self):
+        """Mapbox Static Images max is 1280x1280. Refuse larger."""
+        with patch.dict(os.environ, {"PLOTLINE_MAPBOX_TOKEN": "pk.test"}, clear=True):
+            self.assertIsNone(build_static_aerial(lat=0, lon=0, width=2000, height=400))
+            self.assertIsNone(build_static_aerial(lat=0, lon=0, width=400, height=2000))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
