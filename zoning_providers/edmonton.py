@@ -17,13 +17,27 @@ address. The R-1 / R-2 / R-3 codes were retired by Bylaw 20001 in January
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from .aerial import build_static_aerial
 from .base import ProviderError, ZoningOverlay, ZoningProvider, ZoningResult
+from .parcel_context import LotCharacteristics, ParcelContext
 
 
 # Socrata SoQL endpoints. Public — no auth required for read-only queries
 # under Socrata's default rate limits.
 ZONES_ENDPOINT = "https://data.edmonton.ca/resource/fixa-tstc.json"
 OVERLAYS_ENDPOINT = "https://data.edmonton.ca/resource/6w3s-58pv.json"
+
+# Tier 1 parcel context endpoints — verified against the open-data portal on
+# 2026-05-24. See tests/fixtures/README.md for the field-name source of truth.
+#
+# Edmonton no longer publishes parcel polygons via open data (transferred to
+# Alberta Data Partnerships in November 2021). The Title Parcels dataset
+# below is point-based — we get `area` (m²) but no perimeter. Frontage and
+# depth are therefore not derivable from this source and stay None.
+PARCEL_ENDPOINT = "https://data.edmonton.ca/resource/9tyx-zfd4.json"
+PARCEL_GEOM = "geometry_point"
+PARCEL_AREA_FIELD = "area"
+PARCEL_SEARCH_RADIUS_M = 50  # tight ring around the query point to find the parcel under it
 
 
 # Notes that get attached to specific zone codes to help the user
@@ -124,3 +138,67 @@ class EdmontonZoningProvider(ZoningProvider):
                 bylaw_no=(row.get("bylaw_no") or "").strip() or None,
             ))
         return overlays
+
+    def context(self, lat: float, lon: float) -> Optional[ParcelContext]:
+        """Return Tier 1 parcel context. Never raises — per-feature failures
+        are recorded in `ParcelContext.warnings`. Tasks 6+ will populate
+        permits, heritage, flood, and adjacent-zones fields; this task only
+        covers lot + aerial."""
+        if lat is None or lon is None:
+            return None
+        ctx = ParcelContext()
+        self._populate_lot(ctx, lat, lon)
+        ctx.aerial_image = build_static_aerial(lat=lat, lon=lon)
+        if ctx.aerial_image is None:
+            ctx.warnings.append("aerial image skipped: PLOTLINE_MAPBOX_TOKEN not set")
+        return ctx
+
+    # ------------------------------------------------------------------
+    # Per-feature helpers (Tier 1 parcel context)
+    # ------------------------------------------------------------------
+
+    def _populate_lot(self, ctx: ParcelContext, lat: float, lon: float) -> None:
+        """Fetch the closest title parcel under the coordinate and record its
+        area. Edmonton's open data does not include parcel perimeter, so
+        frontage/depth stay None.
+
+        SoQL: `within_circle(geometry_point, <lat>, <lon>, 50)` plus
+        `distance_in_meters` ORDER returns the nearest parcel centroid first.
+        Limit 1 means we take only that nearest parcel.
+        """
+        try:
+            params = {
+                "$select": f"id,{PARCEL_AREA_FIELD},latitude,longitude",
+                "$where": f"within_circle({PARCEL_GEOM}, {lat}, {lon}, {PARCEL_SEARCH_RADIUS_M})",
+                "$order": f"distance_in_meters({PARCEL_GEOM}, 'POINT({lon} {lat})') ASC",
+                "$limit": "1",
+            }
+            rows = self._get_json(PARCEL_ENDPOINT, params)
+        except ProviderError as exc:
+            ctx.warnings.append(f"parcel lookup failed: {exc}")
+            return
+
+        if not rows:
+            ctx.warnings.append("no parcel found at this coordinate")
+            return
+
+        row = rows[0]
+        area = _coerce_float(row.get(PARCEL_AREA_FIELD))
+        ctx.lot = LotCharacteristics(
+            area_m2=area,
+            frontage_m=None,   # Edmonton parcel point dataset has no perimeter
+            depth_m=None,
+            orientation_deg=None,
+            source="City of Edmonton Title Parcels (Point)",
+            source_url=PARCEL_ENDPOINT,
+        )
+
+
+def _coerce_float(value) -> Optional[float]:
+    """Return value coerced to float, or None for missing/blank/non-numeric."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
