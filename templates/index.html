@@ -739,6 +739,7 @@
       <!-- Tabs -->
       <ul class="nav nav-tabs result-tabs mt-3" id="resultTabs">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabZoning">Zoning Reference</button></li>
+        <li class="nav-item"><button class="nav-link" id="parcelContextTab" data-bs-toggle="tab" data-bs-target="#tabParcelContext"><i class="fas fa-layer-group me-1"></i>Parcel Context</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMuni">Municipality</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabActions">Next Steps</button></li>
       </ul>
@@ -801,6 +802,58 @@
               <div class="text-muted small fw-semibold mb-1">GENERAL DEVELOPMENT REQUIREMENTS</div>
               <p class="text-muted small mb-1"><em>Apply to most development in this jurisdiction. Site-specific requirements must still be confirmed.</em></p>
               <ul class="use-list" id="resDevReqs"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parcel Context tab -->
+        <div class="tab-pane fade" id="tabParcelContext" role="tabpanel" aria-labelledby="parcelContextTab">
+          <div id="parcelContextUnavailable" class="text-muted small" style="display:none">
+            Parcel context layers are only available for verified zones in Edmonton and Calgary today.
+          </div>
+
+          <div id="parcelContextBlock" style="display:none">
+            <!-- Aerial -->
+            <div id="parcelAerialBlock" class="mb-3" style="display:none">
+              <h6 class="fw-bold mb-2">Aerial view</h6>
+              <img id="parcelAerialImg" alt="Aerial image of the parcel"
+                   style="max-width:100%; border:1px solid var(--pl-border); border-radius:6px" />
+              <div id="parcelAerialAttribution" class="text-muted small mt-1"></div>
+            </div>
+
+            <!-- Lot -->
+            <div id="parcelLotBlock" class="mb-3" style="display:none">
+              <h6 class="fw-bold mb-2">Lot characteristics</h6>
+              <div class="row g-2" id="parcelLotGrid"></div>
+              <div class="text-muted small mt-1" id="parcelLotSource"></div>
+            </div>
+
+            <!-- Adjacent zones -->
+            <div id="parcelAdjacentBlock" class="mb-3" style="display:none">
+              <h6 class="fw-bold mb-2">Adjacent zones</h6>
+              <ul class="mb-0" id="parcelAdjacentList" style="list-style:none; padding-left:0"></ul>
+            </div>
+
+            <!-- Overlay flags -->
+            <div id="parcelOverlaysBlock" class="mb-3" style="display:none">
+              <h6 class="fw-bold mb-2">Overlay &amp; hazard flags</h6>
+              <div id="parcelOverlaysChips" class="d-flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Permits -->
+            <div id="parcelPermitsBlock" class="mb-3" style="display:none">
+              <h6 class="fw-bold mb-2">Open &amp; recent permits (last 5 years)</h6>
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <thead><tr><th>Number</th><th>Date</th><th>Status</th><th>Work type</th><th>Description</th></tr></thead>
+                  <tbody id="parcelPermitsBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Warnings -->
+            <div id="parcelWarningsBlock" class="text-muted small" style="display:none">
+              <em id="parcelWarningsText"></em>
             </div>
           </div>
         </div>
@@ -1355,8 +1408,136 @@ function renderResults(data) {
     actionsList.appendChild(li);
   });
 
+  // Parcel context tab
+  renderParcelContext(policy);
+
   // Map
   showMap(data);
+}
+
+function renderParcelContext(policy) {
+  const pc = (policy && policy.parcel_context) || null;
+  const block = document.getElementById('parcelContextBlock');
+  const unavail = document.getElementById('parcelContextUnavailable');
+
+  const hasAnything = pc && (
+    pc.lot
+    || (pc.permits && pc.permits.length)
+    || (pc.adjacent_zones && pc.adjacent_zones.length)
+    || (pc.overlay_flags && pc.overlay_flags.length)
+    || pc.aerial_image
+  );
+
+  if (!hasAnything) {
+    block.style.display = 'none';
+    unavail.style.display = '';
+    return;
+  }
+  block.style.display = '';
+  unavail.style.display = 'none';
+
+  // Aerial
+  const aerialBlock = document.getElementById('parcelAerialBlock');
+  if (pc.aerial_image && pc.aerial_image.url) {
+    document.getElementById('parcelAerialImg').src = pc.aerial_image.url;
+    document.getElementById('parcelAerialAttribution').textContent =
+      pc.aerial_image.attribution || '';
+    aerialBlock.style.display = '';
+  } else {
+    aerialBlock.style.display = 'none';
+  }
+
+  // Lot
+  const lotBlock = document.getElementById('parcelLotBlock');
+  const lotGrid = document.getElementById('parcelLotGrid');
+  lotGrid.innerHTML = '';
+  if (pc.lot) {
+    const fields = [
+      { label: 'Area',        value: pc.lot.area_m2 != null ? pc.lot.area_m2.toFixed(0) + ' m²' : '—' },
+      { label: 'Frontage',    value: pc.lot.frontage_m != null ? pc.lot.frontage_m.toFixed(1) + ' m' : '—' },
+      { label: 'Depth',       value: pc.lot.depth_m != null ? pc.lot.depth_m.toFixed(1) + ' m' : '—' },
+      { label: 'Orientation', value: pc.lot.orientation_deg != null ? pc.lot.orientation_deg.toFixed(0) + '°' : '—' },
+    ];
+    fields.forEach(f => {
+      const col = document.createElement('div');
+      col.className = 'col-6 col-md-3';
+      col.innerHTML =
+        '<div class="summary-card">'
+        + '<div class="sc-label">' + escapeHtml(f.label) + '</div>'
+        + '<div class="sc-value">' + escapeHtml(f.value) + '</div>'
+        + '</div>';
+      lotGrid.appendChild(col);
+    });
+    document.getElementById('parcelLotSource').textContent = 'Source: ' + (pc.lot.source || '');
+    lotBlock.style.display = '';
+  } else {
+    lotBlock.style.display = 'none';
+  }
+
+  // Adjacent zones
+  const adjBlock = document.getElementById('parcelAdjacentBlock');
+  const adjList  = document.getElementById('parcelAdjacentList');
+  adjList.innerHTML = '';
+  if (pc.adjacent_zones && pc.adjacent_zones.length) {
+    pc.adjacent_zones.forEach(z => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        '<i class="fas fa-map-pin use-icon"></i>'
+        + '<strong>' + escapeHtml(z.code) + '</strong>'
+        + ' — ' + escapeHtml(z.name || '')
+        + ' <span class="text-muted">(' + Number(z.count || 0) + ')</span>';
+      adjList.appendChild(li);
+    });
+    adjBlock.style.display = '';
+  } else {
+    adjBlock.style.display = 'none';
+  }
+
+  // Overlay flags
+  const ovBlock = document.getElementById('parcelOverlaysBlock');
+  const ovChips = document.getElementById('parcelOverlaysChips');
+  ovChips.innerHTML = '';
+  if (pc.overlay_flags && pc.overlay_flags.length) {
+    pc.overlay_flags.forEach(f => {
+      const chip = document.createElement('span');
+      chip.className = 'badge bg-warning text-dark';
+      chip.title = (f.description || '') + ' — ' + (f.source || '');
+      chip.textContent = (f.category || '') + ': ' + (f.code || '');
+      ovChips.appendChild(chip);
+    });
+    ovBlock.style.display = '';
+  } else {
+    ovBlock.style.display = 'none';
+  }
+
+  // Permits
+  const pmBlock = document.getElementById('parcelPermitsBlock');
+  const pmBody  = document.getElementById('parcelPermitsBody');
+  pmBody.innerHTML = '';
+  if (pc.permits && pc.permits.length) {
+    pc.permits.forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(p.permit_number || '—') + '</td>'
+        + '<td>' + escapeHtml(p.issue_date || '—') + '</td>'
+        + '<td>' + escapeHtml(p.status || '—') + '</td>'
+        + '<td>' + escapeHtml(p.work_type || '—') + '</td>'
+        + '<td>' + escapeHtml(p.description || '—') + '</td>';
+      pmBody.appendChild(tr);
+    });
+    pmBlock.style.display = '';
+  } else {
+    pmBlock.style.display = 'none';
+  }
+
+  // Warnings
+  if (pc.warnings && pc.warnings.length) {
+    document.getElementById('parcelWarningsText').textContent =
+      'Notes: ' + pc.warnings.join(' · ');
+    document.getElementById('parcelWarningsBlock').style.display = '';
+  } else {
+    document.getElementById('parcelWarningsBlock').style.display = 'none';
+  }
 }
 
 // ── Map ───────────────────────────────────────────────────────
