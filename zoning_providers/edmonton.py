@@ -19,7 +19,13 @@ from typing import List, Optional
 
 from .aerial import build_static_aerial
 from .base import ProviderError, ZoningOverlay, ZoningProvider, ZoningResult
-from .parcel_context import LotCharacteristics, ParcelContext
+from .parcel_context import (
+    AdjacentZone,
+    LotCharacteristics,
+    OverlayFlag,
+    ParcelContext,
+    PermitRecord,
+)
 
 
 # Socrata SoQL endpoints. Public — no auth required for read-only queries
@@ -38,6 +44,32 @@ PARCEL_ENDPOINT = "https://data.edmonton.ca/resource/9tyx-zfd4.json"
 PARCEL_GEOM = "geometry_point"
 PARCEL_AREA_FIELD = "area"
 PARCEL_SEARCH_RADIUS_M = 50  # tight ring around the query point to find the parcel under it
+
+# Edmonton development permits — point dataset.
+PERMIT_ENDPOINT = "https://data.edmonton.ca/resource/q4gd-6q9r.json"
+PERMIT_GEOM = "location"
+PERMIT_NUMBER_FIELD = "city_file_number"
+PERMIT_DATE_FIELD = "permit_date"
+PERMIT_STATUS_FIELD = "status"
+PERMIT_WORKTYPE_FIELD = "permit_type"
+PERMIT_DESCRIPTION_FIELD = "description_of_development"
+PERMIT_SEARCH_RADIUS_M = 50
+PERMIT_LOOKBACK_YEARS = 5
+
+# Edmonton heritage — point dataset (Register and Inventory of Historic Resources).
+HERITAGE_ENDPOINT = "https://data.edmonton.ca/resource/jgsn-dhai.json"
+HERITAGE_GEOM = "geometry_point"
+HERITAGE_NAME_FIELD = "name_of_historic_resource"
+HERITAGE_RADIUS_M = 25
+
+# Edmonton "flood" is encoded as zoning overlays — same dataset as OVERLAYS_ENDPOINT,
+# filtered to the three flood-related codes. We deliberately reuse the existing
+# OVERLAYS_ENDPOINT constant rather than defining a separate flood endpoint.
+FLOOD_OVERLAY_CODES = ("FP", "NSRV", "NS10")
+
+# Adjacent zones — reuses the existing ZONES_ENDPOINT (fixa-tstc).
+# 300 m radius (not 100 m) because Edmonton's downtown zoning polygons are large.
+NEIGHBOUR_ZONES_RADIUS_M = 300
 
 
 # Notes that get attached to specific zone codes to help the user
@@ -141,13 +173,17 @@ class EdmontonZoningProvider(ZoningProvider):
 
     def context(self, lat: float, lon: float) -> Optional[ParcelContext]:
         """Return Tier 1 parcel context. Never raises — per-feature failures
-        are recorded in `ParcelContext.warnings`. Tasks 6+ will populate
-        permits, heritage, flood, and adjacent-zones fields; this task only
-        covers lot + aerial."""
+        are recorded in `ParcelContext.warnings`. Call order (parcel,
+        permits, heritage, flood, neighbour zones) is locked because the
+        tests in tests/test_edmonton_context.py mock responses in that order."""
         if lat is None or lon is None:
             return None
         ctx = ParcelContext()
         self._populate_lot(ctx, lat, lon)
+        self._populate_permits(ctx, lat, lon)
+        self._populate_heritage(ctx, lat, lon)
+        self._populate_flood(ctx, lat, lon)
+        self._populate_adjacent_zones(ctx, lat, lon)
         ctx.aerial_image = build_static_aerial(lat=lat, lon=lon)
         if ctx.aerial_image is None:
             ctx.warnings.append("aerial image skipped: PLOTLINE_MAPBOX_TOKEN not set")
@@ -191,6 +227,124 @@ class EdmontonZoningProvider(ZoningProvider):
             orientation_deg=None,
             source="City of Edmonton Title Parcels (Point)",
             source_url=PARCEL_ENDPOINT,
+        )
+
+    def _populate_permits(self, ctx: ParcelContext, lat: float, lon: float) -> None:
+        """Last 5 years of Development Permits at the coordinate. Point dataset
+        — use a 50 m circle so we include the parcel under the point plus any
+        immediate neighbours that share an address-tagged location."""
+        from datetime import datetime, timedelta, timezone
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=365 * PERMIT_LOOKBACK_YEARS)).strftime(
+            "%Y-%m-%dT00:00:00.000"
+        )
+        try:
+            params = {
+                "$select": ",".join([
+                    PERMIT_NUMBER_FIELD, PERMIT_DATE_FIELD, PERMIT_STATUS_FIELD,
+                    PERMIT_WORKTYPE_FIELD, PERMIT_DESCRIPTION_FIELD,
+                ]),
+                "$where": (
+                    f"within_circle({PERMIT_GEOM}, {lat}, {lon}, {PERMIT_SEARCH_RADIUS_M})"
+                    f" AND {PERMIT_DATE_FIELD} > '{cutoff}'"
+                ),
+                "$order": f"{PERMIT_DATE_FIELD} DESC",
+                "$limit": "20",
+            }
+            rows = self._get_json(PERMIT_ENDPOINT, params)
+        except ProviderError as exc:
+            ctx.warnings.append(f"permit lookup failed: {exc}")
+            return
+
+        for row in rows:
+            number = (row.get(PERMIT_NUMBER_FIELD) or "").strip()
+            if not number:
+                continue
+            date_raw = (row.get(PERMIT_DATE_FIELD) or "").strip()
+            ctx.permits.append(PermitRecord(
+                permit_number=number,
+                issue_date=date_raw[:10] if date_raw else None,
+                status=(row.get(PERMIT_STATUS_FIELD) or "").strip() or None,
+                work_type=(row.get(PERMIT_WORKTYPE_FIELD) or "").strip() or None,
+                description=(row.get(PERMIT_DESCRIPTION_FIELD) or "").strip() or None,
+                source="City of Edmonton Development Permits",
+                source_url=PERMIT_ENDPOINT,
+            ))
+
+    def _populate_heritage(self, ctx: ParcelContext, lat: float, lon: float) -> None:
+        try:
+            params = {
+                "$select": f"{HERITAGE_NAME_FIELD},building_address",
+                "$where": f"within_circle({HERITAGE_GEOM}, {lat}, {lon}, {HERITAGE_RADIUS_M})",
+                "$limit": "10",
+            }
+            rows = self._get_json(HERITAGE_ENDPOINT, params)
+        except ProviderError as exc:
+            ctx.warnings.append(f"heritage lookup failed: {exc}")
+            return
+        for row in rows:
+            name = (row.get(HERITAGE_NAME_FIELD) or "").strip()
+            if not name:
+                continue
+            ctx.overlay_flags.append(OverlayFlag(
+                category="heritage",
+                code=name[:60],
+                description=f"Designated historic resource within {HERITAGE_RADIUS_M} m",
+                source="City of Edmonton Register and Inventory of Historic Resources",
+                source_url=HERITAGE_ENDPOINT,
+            ))
+
+    def _populate_flood(self, ctx: ParcelContext, lat: float, lon: float) -> None:
+        """Edmonton has no dedicated flood dataset. Flood-risk lands are encoded
+        in the same Zoning Overlays dataset that backs _query_overlays, filtered
+        to the FP / NSRV / NS10 overlay codes."""
+        codes_clause = " OR ".join(f"overlay_code='{code}'" for code in FLOOD_OVERLAY_CODES)
+        try:
+            params = {
+                "$select": "overlay_code,overlay_descr,bylaw_no",
+                "$where": (
+                    f"intersects(geometry_multipolygon, 'POINT({lon} {lat})')"
+                    f" AND ({codes_clause})"
+                ),
+                "$limit": "5",
+            }
+            rows = self._get_json(OVERLAYS_ENDPOINT, params)
+        except ProviderError as exc:
+            ctx.warnings.append(f"flood lookup failed: {exc}")
+            return
+        for row in rows:
+            code = (row.get("overlay_code") or "").strip()
+            desc = (row.get("overlay_descr") or "").strip() or "Flood-related overlay"
+            if not code:
+                continue
+            ctx.overlay_flags.append(OverlayFlag(
+                category="flood",
+                code=code,
+                description=desc,
+                source="City of Edmonton Zoning Overlays (flood)",
+                source_url=OVERLAYS_ENDPOINT,
+            ))
+
+    def _populate_adjacent_zones(self, ctx: ParcelContext, lat: float, lon: float) -> None:
+        try:
+            params = {
+                "$select": "zoning,description",
+                "$where": f"within_circle(geometry_multipolygon, {lat}, {lon}, {NEIGHBOUR_ZONES_RADIUS_M})",
+                "$limit": "50",
+            }
+            rows = self._get_json(ZONES_ENDPOINT, params)
+        except ProviderError as exc:
+            ctx.warnings.append(f"adjacent-zones lookup failed: {exc}")
+            return
+        counts: dict = {}
+        for row in rows:
+            code = (row.get("zoning") or "").strip()
+            if not code:
+                continue
+            entry = counts.setdefault(code, {"name": (row.get("description") or "").strip(), "count": 0})
+            entry["count"] += 1
+        ctx.adjacent_zones = sorted(
+            [AdjacentZone(code=c, name=v["name"], count=v["count"]) for c, v in counts.items()],
+            key=lambda z: (-z.count, z.code),
         )
 
 

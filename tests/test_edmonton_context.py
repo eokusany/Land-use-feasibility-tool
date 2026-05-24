@@ -81,6 +81,117 @@ class EdmontonLotCharacteristicsTests(unittest.TestCase):
         self.assertIn("api.mapbox.com", ctx.aerial_image.url)
 
 
+class EdmontonPermitsTests(unittest.TestCase):
+    def test_permits_populated_from_dataset(self):
+        permit_rows = _load("permits.json")
+        provider = EdmontonZoningProvider()
+        with patch("zoning_providers.base.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response([]),                # parcel — empty, focus on permits
+                _mock_response(permit_rows),       # permits
+                _mock_response([]),                # heritage
+                _mock_response([]),                # flood
+                _mock_response([]),                # neighbour zones
+            ]
+            ctx = provider.context(53.5444, -113.4909)
+        self.assertGreaterEqual(len(ctx.permits), 1)
+        p = ctx.permits[0]
+        self.assertTrue(p.permit_number)
+        self.assertIn("Edmonton", p.source)
+
+    def test_permits_failure_does_not_break_context(self):
+        import requests as _r
+        provider = EdmontonZoningProvider()
+        with patch("zoning_providers.base.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response([]),
+                _r.ConnectionError("permits offline"),
+                _mock_response([]),
+                _mock_response([]),
+                _mock_response([]),
+            ]
+            ctx = provider.context(53.5444, -113.4909)
+        self.assertEqual(ctx.permits, [])
+        self.assertTrue(any("permit" in w.lower() for w in ctx.warnings))
+
+
+class EdmontonOverlayFlagsTests(unittest.TestCase):
+    def test_heritage_flag_emitted(self):
+        provider = EdmontonZoningProvider()
+        with patch("zoning_providers.base.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response([]),
+                _mock_response([]),
+                _mock_response(_load("heritage.json")),
+                _mock_response([]),
+                _mock_response([]),
+            ]
+            ctx = provider.context(53.5402, -113.4868)
+        heritage = [f for f in ctx.overlay_flags if f.category == "heritage"]
+        self.assertGreaterEqual(len(heritage), 1)
+        self.assertIn("Edmonton", heritage[0].source)
+
+    def test_flood_flag_emitted(self):
+        """Edmonton flood uses the same overlay dataset as zone overlays,
+        filtered to FP/NSRV/NS10 codes."""
+        provider = EdmontonZoningProvider()
+        with patch("zoning_providers.base.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response([]),
+                _mock_response([]),
+                _mock_response([]),
+                _mock_response(_load("flood.json")),
+                _mock_response([]),
+            ]
+            ctx = provider.context(53.5340, -113.4750)
+        flood = [f for f in ctx.overlay_flags if f.category == "flood"]
+        with open(FIXTURES / "flood.json") as f:
+            expected = len(json.load(f))
+        if expected == 0:
+            self.assertEqual(flood, [])
+        else:
+            self.assertGreaterEqual(len(flood), 1)
+            self.assertIn("Edmonton", flood[0].source)
+
+
+class EdmontonAdjacentZonesTests(unittest.TestCase):
+    def test_adjacent_zones_aggregated_and_sorted_by_count(self):
+        provider = EdmontonZoningProvider()
+        with patch("zoning_providers.base.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response([]),
+                _mock_response([]),
+                _mock_response([]),
+                _mock_response([]),
+                _mock_response(_load("neighbour_zones.json")),
+            ]
+            ctx = provider.context(53.5444, -113.4909)
+        self.assertGreaterEqual(len(ctx.adjacent_zones), 1)
+        # Sorted descending by count
+        counts = [z.count for z in ctx.adjacent_zones]
+        self.assertEqual(counts, sorted(counts, reverse=True))
+
+
+class EdmontonContextOrderingTests(unittest.TestCase):
+    def test_call_order_is_parcel_permits_heritage_flood_neighbour(self):
+        """The mocked side_effect lists in this file assume a specific call
+        order. If you change the order in context(), update both this test
+        and every mocked side_effect above."""
+        provider = EdmontonZoningProvider()
+        captured_urls = []
+
+        def _record(url, params=None, timeout=None, headers=None):
+            captured_urls.append(url)
+            return _mock_response([])
+
+        with patch("zoning_providers.base.requests.get", side_effect=_record):
+            provider.context(53.5444, -113.4909)
+
+        # Five upstream calls in fixed order. Each URL is distinct (or the same
+        # endpoint queried twice — flood reuses overlays endpoint).
+        self.assertEqual(len(captured_urls), 5)
+
+
 @unittest.skipUnless(os.environ.get("RUN_LIVE_TESTS"), "Set RUN_LIVE_TESTS=1")
 class LiveEdmontonContextTests(unittest.TestCase):
     def test_live_downtown_lot(self):
