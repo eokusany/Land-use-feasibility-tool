@@ -1,0 +1,18 @@
+[
+    {
+        "zoning": "PSN",
+        "description": "Neighbourhood Parks and Services"
+    },
+    {
+        "zoning": "PS",
+        "description": "Parks and Services"
+    },
+    {
+        "zoning": "DC1",
+        "description": "Direct Development Control Provision"
+    },
+    {
+        "zoning": "CCA",
+        "description": "Core Commercial Arts Zone"
+    }
+]

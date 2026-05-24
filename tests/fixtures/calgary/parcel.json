@@ -1,0 +1,74 @@
+[
+    {
+        "roll_year": "2026",
+        "roll_number": "201562352",
+        "address": "110 9 AV SW",
+        "assessed_value": "8940000.0",
+        "assessment_class": "NR",
+        "assessment_class_description": "Non-Residential",
+        "re_assessed_value": "0.0",
+        "nr_assessed_value": "8940000.0",
+        "fl_assessed_value": "0.0",
+        "comm_code": "DNC",
+        "comm_name": "DOWNTOWN COMMERCIAL CORE",
+        "year_of_construction": "2010.0",
+        "land_use_designation": "CR20-C20/R20",
+        "property_type": "LI",
+        "land_size_sm": "2568.1",
+        "land_size_sf": "27644.0",
+        "land_size_ac": "0.63",
+        "mod_date": "2026-01-14T00:00:00.000Z",
+        "sub_property_use": "C101",
+        "multipolygon": {
+            "type": "MultiPolygon",
+            "coordinates": [
+                [
+                    [
+                        [
+                            -114.0642223,
+                            51.0447434
+                        ],
+                        [
+                            -114.0642205,
+                            51.0447434
+                        ],
+                        [
+                            -114.0642123,
+                            51.0447432
+                        ],
+                        [
+                            -114.0632884,
+                            51.0447168
+                        ],
+                        [
+                            -114.0632438,
+                            51.0447425
+                        ],
+                        [
+                            -114.0632215,
+                            51.0450527
+                        ],
+                        [
+                            -114.0641881,
+                            51.0450801
+                        ],
+                        [
+                            -114.0641964,
+                            51.0450803
+                        ],
+                        [
+                            -114.0641981,
+                            51.0450803
+                        ],
+                        [
+                            -114.0642223,
+                            51.0447434
+                        ]
+                    ]
+                ]
+            ]
+        },
+        "cpid": "96149735",
+        "unique_key": "202620156235296149735"
+    }
+]
