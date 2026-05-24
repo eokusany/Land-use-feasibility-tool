@@ -107,7 +107,10 @@ class ReportGenerator:
         
         # Zoning and policy analysis
         story.extend(self._create_policy_section(analysis_data))
-        
+
+        # Tier 1 — parcel context (lot, adjacent zones, permits, overlays)
+        story.extend(self._create_parcel_context_section(analysis_data))
+
         # Development analysis (if cottage development data available)
         if 'cottage_analysis' in analysis_data:
             story.extend(self._create_development_analysis(analysis_data))
@@ -509,7 +512,110 @@ class ReportGenerator:
             story.append(Spacer(1, 0.1*inch))
 
         return story
-    
+
+    def _create_parcel_context_section(self, data: Dict) -> List:
+        """Tier 1 parcel context — lot, permits, adjacent zones, overlays.
+        Aerial image URL is captured in policy_info but not embedded in the
+        PDF (image fetching is out of scope for Tier 1)."""
+        story = []
+        policy_info = data.get('policy_info', {}) or {}
+        pc = policy_info.get('parcel_context') or {}
+
+        # Skip the whole section when nothing was populated (e.g. unverified
+        # city, or all features returned empty).
+        has_content = bool(
+            pc.get('lot') or pc.get('permits') or pc.get('adjacent_zones')
+            or pc.get('overlay_flags')
+        )
+        if not has_content:
+            return story
+
+        story.append(Paragraph("Parcel Context", self.styles['Subtitle']))
+        story.append(Spacer(1, 0.2 * inch))
+
+        # --- Lot ---
+        lot = pc.get('lot')
+        if lot:
+            story.append(Paragraph("Lot Characteristics", self.styles['SectionHeader']))
+            rows = [
+                ['Area', f"{lot.get('area_m2'):.0f} m²" if lot.get('area_m2') is not None else '—'],
+                ['Frontage', f"{lot.get('frontage_m'):.1f} m" if lot.get('frontage_m') is not None else '—'],
+                ['Depth', f"{lot.get('depth_m'):.1f} m" if lot.get('depth_m') is not None else '—'],
+                ['Source', lot.get('source') or '—'],
+            ]
+            t = Table(rows, colWidths=[1.6 * inch, 4.4 * inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('FONTNAME',   (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('VALIGN',     (0, 0), (-1, -1), 'TOP'),
+                ('GRID',       (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(t)
+            story.append(Paragraph(
+                "<i>Frontage and depth are not exposed by the Edmonton or Calgary "
+                "open-data parcel datasets today. Confirm dimensions against the "
+                "registered plan of survey for the lot.</i>",
+                self.styles['Normal'],
+            ))
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Adjacent zones ---
+        adjacent = pc.get('adjacent_zones') or []
+        if adjacent:
+            story.append(Paragraph("Adjacent Zones", self.styles['SectionHeader']))
+            for z in adjacent:
+                story.append(Paragraph(
+                    f"• <b>{z['code']}</b> — {z.get('name', '')} "
+                    f"<font color='grey'>({z['count']})</font>",
+                    self.styles['Normal'],
+                ))
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Overlay flags ---
+        overlays = pc.get('overlay_flags') or []
+        if overlays:
+            story.append(Paragraph("Overlay &amp; Hazard Flags", self.styles['SectionHeader']))
+            for f in overlays:
+                story.append(Paragraph(
+                    f"• [{f['category'].upper()}] <b>{f['code']}</b> — {f['description']}",
+                    self.styles['Normal'],
+                ))
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Permits ---
+        permits = pc.get('permits') or []
+        if permits:
+            story.append(Paragraph("Open &amp; Recent Permits (last 5 years)", self.styles['SectionHeader']))
+            rows = [['Number', 'Date', 'Status', 'Type']]
+            for p in permits:
+                rows.append([
+                    p.get('permit_number') or '—',
+                    p.get('issue_date') or '—',
+                    p.get('status') or '—',
+                    p.get('work_type') or '—',
+                ])
+            t = Table(rows, colWidths=[1.4 * inch, 1.1 * inch, 1.2 * inch, 2.3 * inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('GRID',       (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN',     (0, 0), (-1, -1), 'TOP'),
+                ('FONTSIZE',   (0, 0), (-1, -1), 8),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 0.15 * inch))
+
+        # --- Warnings (kept terse, footnote-style) ---
+        warnings = pc.get('warnings') or []
+        if warnings:
+            story.append(Paragraph(
+                "<i>Notes: " + "; ".join(warnings) + "</i>",
+                self.styles['Normal'],
+            ))
+            story.append(Spacer(1, 0.1 * inch))
+
+        return story
+
     def _create_development_analysis(self, data: Dict) -> List:
         """Create development analysis section"""
         story = []

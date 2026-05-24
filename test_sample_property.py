@@ -70,5 +70,57 @@ class SamplePropertyPipelineTest(unittest.TestCase):
         self.assertEqual(policy["setbacks"], {})
 
 
+class ReportGeneratorParcelContextTest(unittest.TestCase):
+    """Test that the ParcelContext section renders in the PDF report."""
+
+    def test_report_contains_parcel_context_section(self):
+        """Build a PDF with a populated parcel_context block and verify size."""
+        from report_generator import ReportGenerator
+        import os
+        import tempfile
+
+        rg = ReportGenerator()
+        data = {
+            "property_info": {"raw_input": {"address": "1 Sir Winston Churchill Sq"}},
+            "municipality_info": {"name": "Edmonton", "province": "AB"},
+            "policy_info": {
+                "verification_status": "verified",
+                "zoning_code": "CCA",
+                "zoning": "CCA — Core Commercial Arts Zone",
+                "parcel_context": {
+                    "lot": {
+                        "area_m2": 14543.0, "frontage_m": None, "depth_m": None,
+                        "orientation_deg": None,
+                        "source": "City of Edmonton Title Parcels (Point)",
+                        "source_url": "https://data.edmonton.ca/resource/9tyx-zfd4.json",
+                    },
+                    "adjacent_zones": [
+                        {"code": "CCA", "name": "Core Commercial Arts", "count": 2},
+                        {"code": "DC1", "name": "Direct Development Control", "count": 1},
+                    ],
+                    "permits": [
+                        {"permit_number": "DP-2024-0001", "issue_date": "2024-08-01",
+                         "status": "Released", "work_type": "Renovation",
+                         "description": "Lobby renovation",
+                         "source": "City of Edmonton Development Permits",
+                         "source_url": "https://data.edmonton.ca/resource/q4gd-6q9r.json"},
+                    ],
+                    "overlay_flags": [
+                        {"category": "heritage", "code": "Macdonald Hotel",
+                         "description": "Designated historic resource within 25 m",
+                         "source": "City of Edmonton Register and Inventory of Historic Resources",
+                         "source_url": "https://data.edmonton.ca/resource/jgsn-dhai.json"},
+                    ],
+                    "aerial_image": None,
+                    "warnings": ["aerial image skipped: PLOTLINE_MAPBOX_TOKEN not set"],
+                },
+            },
+            "analysis_date": "2026-05-24T10:00:00",
+        }
+        path = rg.create_report(data)
+        self.assertTrue(os.path.exists(path), f"Report PDF should exist at {path}")
+        self.assertGreater(os.path.getsize(path), 1000, "Report PDF should be > 1000 bytes")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
