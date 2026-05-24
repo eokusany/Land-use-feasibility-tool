@@ -11,6 +11,17 @@
 - [x] **Metrics / observability** — shipped 2026-05-23 (provider/status/latency logged)
 - [ ] **Rate limiting / Socrata app tokens** — still pending (requires real token)
 
+## Tier 1 parcel context (shipped 2026-05-24)
+
+- [x] Lot characteristics (Edmonton + Calgary; area only — neither city publishes perimeter)
+- [x] Adjacent zones (Edmonton 300 m, Calgary 250 m)
+- [x] Open permit history (last 5 years)
+- [x] Static aerial image (Mapbox; requires PLOTLINE_MAPBOX_TOKEN)
+- [x] Heritage / flood overlay flags
+
+See [docs/superpowers/plans/2026-05-24-tier1-parcel-context.md](docs/superpowers/plans/2026-05-24-tier1-parcel-context.md)
+for the implementation plan and rollout notes.
+
 **Current rollout plan:** collect real user feedback on the Edmonton
 deployment first. Only scale to the next Tier 1 city once we've validated
 the verified-zone UX, the overlay display, and the DC1/DC2 note pattern

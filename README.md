@@ -35,6 +35,7 @@ For supported cities (currently **Edmonton**), CanLand additionally returns:
 - A deep link into the bylaw section governing that specific zone
 - Provider notes for site-specific zones (DC1/DC2 in Edmonton, CD-1 in
   Vancouver, etc.) where there is no generic rule set
+- **Parcel context (Edmonton + Calgary):** Lot area, adjacent zones, recent permits, heritage and flood flags, plus a satellite snapshot of the parcel.
 
 Setbacks, height limits, density, and permitted uses are never fabricated —
 even with a verified zone code, those live in bylaw text. CanLand sends the
@@ -176,6 +177,7 @@ Environment variables:
 | `CANLAND_HTTP_CACHE_TTL_SECONDS`  | `600`        | HTTP cache TTL for municipal-API responses               |
 | `CANLAND_GEOCODE_BOUNDARY_KM`     | `80`         | Max distance from muni centroid before geocode rejected  |
 | `CANLAND_NOMINATIM_CONTACT`       | `canland@example.com` | Email in Nominatim User-Agent (per their ToS)   |
+| `PLOTLINE_MAPBOX_TOKEN`           | *unset*      | Optional. Public Mapbox token (`pk.…`). When set, verified Edmonton and Calgary reports include a static aerial image of the parcel in the UI and the data payload. Sign up at https://account.mapbox.com/ — free tier covers Plotline's current volume. |
 | `RUN_LIVE_TESTS`                  | *unset*      | When `1`, live-API tests run                             |
 
 ### HTTP cache (production)
