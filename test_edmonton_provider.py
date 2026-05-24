@@ -233,6 +233,48 @@ class PolicyRetrievalIntegrationTests(unittest.TestCase):
         self.assertTrue(policy["verification_required"])
         self.assertIsNone(policy["zoning"])
 
+    def test_verified_path_includes_parcel_context(self):
+        """When a parcel context is available, policy_info gains a `parcel_context` key."""
+        with patch("zoning_providers.base.requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response(ZONE_HIT),       # zone lookup
+                _mock_response(OVERLAYS_HIT),   # overlays
+                _mock_response([]),             # parcel
+                _mock_response([]),             # permits
+                _mock_response([]),             # heritage
+                _mock_response([]),             # flood
+                _mock_response([]),             # neighbour zones
+            ]
+            policy = self.pr.get_land_use_policies(self.muni, self.prop_with_coords)
+        self.assertIn("parcel_context", policy)
+        pc = policy["parcel_context"]
+        self.assertIsInstance(pc, dict)
+        self.assertIn("lot", pc)
+        self.assertIn("permits", pc)
+        self.assertIn("adjacent_zones", pc)
+        self.assertIn("overlay_flags", pc)
+        self.assertIn("aerial_image", pc)
+        self.assertIn("warnings", pc)
+
+    def test_context_failure_does_not_downgrade_verification(self):
+        """A blown-up context() must NOT change verification_status."""
+        class _Boom(Exception):
+            pass
+
+        with patch("zoning_providers.base.requests.get") as mock_get, \
+             patch(
+                 "zoning_providers.edmonton.EdmontonZoningProvider.context",
+                 side_effect=_Boom("explode"),
+             ):
+            mock_get.side_effect = [
+                _mock_response(ZONE_HIT),
+                _mock_response(OVERLAYS_HIT),
+            ]
+            policy = self.pr.get_land_use_policies(self.muni, self.prop_with_coords)
+        self.assertEqual(policy["verification_status"], "verified")
+        self.assertIn("parcel_context", policy)
+        self.assertTrue(any("context" in w.lower() for w in policy["parcel_context"]["warnings"]))
+
 
 # ---------------------------------------------------------------------------
 # Live integration test — gated by env var so CI doesn't hammer the city

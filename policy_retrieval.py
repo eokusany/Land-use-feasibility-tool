@@ -127,6 +127,7 @@ class PolicyRetrieval:
             "zone_retrieved_at": None,
             "zone_bylaw_section_url": None,
             "zone_provider_notes": [],
+            "parcel_context": None,
 
             # Permitted/discretionary uses, setbacks, density, height — we
             # still do not fabricate these. Even with a real zone code, the
@@ -281,6 +282,24 @@ class PolicyRetrieval:
         policy_info["zone_retrieved_at"] = result.retrieved_at
         policy_info["zone_bylaw_section_url"] = result.bylaw_section_url
         policy_info["zone_provider_notes"] = list(result.provider_notes)
+
+        # ------------------------------------------------------------------
+        # Tier 1 parcel context — best-effort. A context failure must NEVER
+        # downgrade verification_status; we only attach what the provider
+        # returns and record any errors in parcel_context.warnings.
+        # ------------------------------------------------------------------
+        try:
+            parcel_ctx = provider.context(float(lat), float(lon))
+        except Exception as exc:  # noqa: BLE001 — context() promises not to raise; trap defensively.
+            logger.warning("provider.context() raised: %s", exc)
+            from zoning_providers.parcel_context import ParcelContext
+            parcel_ctx = ParcelContext()
+            parcel_ctx.warnings.append(f"parcel context unavailable: {exc}")
+
+        if parcel_ctx is None:
+            policy_info["parcel_context"] = None
+        else:
+            policy_info["parcel_context"] = parcel_ctx.to_dict()
 
     # ------------------------------------------------------------------
     # Observability
